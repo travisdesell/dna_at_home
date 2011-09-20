@@ -1,0 +1,282 @@
+Gibbs - A program for detecting subtle sequence signals      
+
+For installing from source, see the INSTALL file included with the source code 
+distribution.
+
+Please report any problems to gibbs@brown.edu.
+
+For information and documentation see the following:
+http://bayesweb.wadsworth.org/gibbs/gibbs.html
+
+Thompson, W., S. Conlan, L.A. McCue, and C.E. Lawrence. 2007. Using the Gibbs 
+Motif Sampler for Phylogenetic Footprinting. In Methods in Molecular Biology, 
+Comparative Genomics (ed. N. Bergman), pp. 403-423. Humana Press.
+
+Thompson, W., L.A. McCue, and C.E. Lawrence. 2005. Using the Gibbs Motif 
+Sampler to Find Conserved Domains in DNA and Protein Sequences. In Current 
+Protocols in Bioinformatics (eds. A.D. Baxevanis D.B. Davison R.D.M. 
+Page G.A. Petsko L.D. Stein, and G.D. Stormo), pp. 2.8.1-2.8.38. John Wiley 
+& Sons, Inc., New York, NY.
+
+This program is licensed under the GNU General Public License (GPL). See the 
+file, gpl.license.txt, for details.
+                                                              
+ Please acknowledge the program authors on any publication of 
+ scientific results based in part on use of the program and   
+ cite the following articles in which the program was         
+ described.                                                   
+ For data involving protein sequences,                        
+ Detecting subtle sequence signals: A Gibbs sampling          
+ strategy for multiple alignment. Lawrence, C. Altschul,      
+ S. Boguski, M. Liu, J. Neuwald, A. and Wootton, J.           
+ Science, 262:208-214, 1993.                                  
+ and                                                          
+ Bayesian models for multiple local sequence alignment        
+ and Gibbs sampling strategies, Liu, JS. Neuwald, AF. and     
+ Lawrence, CE. J. Amer Stat. Assoc. 90:1156-1170, 1995.       
+ For data involving nucleotide sequences,                     
+ Gibbs Recursive Sampler: finding transcription factor        
+ binding sites. W. Thompson, E. C. Rouchka and                
+ C. E. Lawrence, Nucleic Acids Research, 2003,                
+ Vol. 31, No. 13 3580-3585.                                   
+                                                              
+ Copyright (C) 2006   Health Research Inc.                    
+ HEALTH RESEARCH INCORPORATED (HRI),                          
+ ONE UNIVERSITY PLACE, RENSSELAER, NY 12144-3455.             
+ Email:  gibbsamp@wadsworth.org                               
+                                                              
+                                                             
+ Changes Copyright (C) 2007   Brown University                
+ Brown University                                             
+ Providence, RI 02912                                         
+ Email:  gibbs@brown.edu                                      
+                                                              
+ For the Centroid sampler, please site,                       
+ Thompson, W.A., Newberg, L., Conlan, S.P., McCue, L.A. and   
+ Lawrence, C.E. (2007) The Gibbs Centroid Sampler              
+ Nucl. Acids Res., doi:10.1093/nar/gkm265                     
+                                                              
+ For the Phylogenetic Gibbs Sampler, please site,             
+ Newberg, L., Thompson, W.A., Conlan, S.P., Smith, T.M.,      
+ McCue, L.A. and Lawrence, C.E. (2007) A phylogenetic Gibbs   
+ sampler that yields centroid solutions for cis regulatory     
+ site prediction., Bioinformatics,                            
+ doi:10.1093/bioinformatics/btm241.                           
+
+ This program is free software; you can redistribute it       
+ and/or modify it under the terms of the GNU General Public   
+ License as published by the Free Software Foundation;        
+ either version 2 of the License, or (at your option)         
+ any later version.                                           
+                                                              
+ This program is distributed in the hope that it will be      
+ useful, but WITHOUT ANY WARRANTY; without even the implied   
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR      
+ PURPOSE. See the GNU General Public License for more         
+ details.                                                     
+                                                              
+ You should have received a copy of the GNU General Public    
+ License along with this program; if not, write to the        
+ Free Software Foundation, Inc., 51 Franklin Street,          
+ Fifth Floor, Boston, MA  02110-1301, USA.                    
+                                                              
+New command line options for centroid solutions:
+-bayes <burn_in,sampling> - turn on sampling of the centroid. The defaults are
+		            burn_in=2000, sampling=8000 iterations. This option
+                            will display the centroid solution. It will not
+                            display the optimal, frequency of maximum MAP 
+                            solution.You can use the -opt, -freq, and -max 
+                            options to view these models. -bayes sets the 
+                            -sample_model option.
+
+-align_centroid           - after the centroid solution is displayed, Gibbs 
+                            will attempt to align the centroid and flanking 
+                            positions to produce an alignment and model 
+                            similar those produced by MAP solutions. It can 
+                            be used to determine the more highly conserved 
+                            positions in the centroid. This optionis turned 
+                            off by default.
+
+-bayes_counts             - dump the sampling counts to the output file. 
+                            This will produce a report of the number of times 
+                            each position is sampled for each random seed.
+
+-opt
+-freq
+-max                      - report the near-optimal, frequency or maximal MAP 
+                            solutions along with the centroid solution.
+
+-pred_update              - use predictive update to estimate motif model 
+                            instead of sampling from Dirichlet for the 
+                            centroid model. This is the defualt when -bayes is
+                             not used. -sample_model is the default for -bayes.
+
+-sample_model             - sample the model rather than use predictive update.
+                            this is the default for -bayes
+
+
+Using the Phylogenetic Sampler
+
+To use the phylogenetic sampler, create a prior file. See 
+http://bayesweb.wadsworth.org/gibbs/prior.html. Phylogenetic sequences 
+should first be aligned. We have used CLUSTALW and MUSCLE successfully. 
+If your multiple sequence alignment program places -'s in the sequences, 
+replace them with N's.
+
+In the prior file, describe the phylogeny using a tree in Newick 
+format similar to the following:
+
+! tree from /orthogibbs6/select_align/study72
+! based on all 72 intergenics
+>TREE 1 6
+((KPNE:0.32222,(ECOL:0.00601,SFLE:0.02473):0.14695):0.03788,((SBON:0.06927,SENT:0.08519):0.12679,CROD:0.14350):0.00000);
+>
+
+The !'s are comments. The tree description starts with '>TREE n m' where n 
+is the starting sequence that the tree describes and m is the ending sequence.
+'>TREE 1 6' says this tree describes sequences 1 through 6 in the Fasta file. 
+The names of the species in the tree don't matter, but the sequences in the 
+Fasta file must be in the same order as in the tree, i.e. it doesn't matter 
+if the header in the first Fasta sequence contains KPNE, just that the 
+sequence from the species described by the first branch of the tree is first 
+in the file; the sequence for the ECOL branch in the example above is second 
+in the Fasta file etc. If you have multiple aligned groups of sequences, 
+called MASSes in (Newberg et al. 2007), then use a second >TREE statement. 
+Unaligned sequences are not described by trees.
+
+All of the unaligned sequences should be at the end of the Fasta file.
+
+We also used sequence weights. They are described by a >WEIGHT command in the 
+prior file. For example, 
+
+>WEIGHT
+1 0.3358
+2 0
+3 0.325724
+4 0.148832
+5 0.217804
+6 0.161971
+7 0.578202
+8 0.616242
+>
+
+The format of each line is 'sequence_number sequence_weight' Notice that 
+only 6 sequences are described by the tree, but 8 sequences have weights. 
+Sequences which do not have assigned weights default to a weight of 1.0. 
+We calculated weights using the method of (Newberg et al. 2005).
+
+You can use the program seq.weights.pl to calculate sequence weights from a 
+tree. This is a perl program. It uses BioPerl, available from 
+http://www.bioperl.org/wiki/Main_Page and Math::Matrix, available from CPAN,
+http://www.cpan.org/.
+
+Here's a typical command line:
+
+/users/thompson/gibbs/bin/Gibbs.opteron /users/thompson/phylo/study_set/data/real/purT.6.fa 16 12 -n -E 4 -r -R 1,1,8 -P /users/thompson/phylo/study_set/data/ortho.14.pr -o /users/thompson/phylo/study_set/output/purT.30.out -S 10 -bayes 2000,8000 -B /users/thompson/phylo/study_set/data/real/purT.6.fa_info-det
+
+-r -R 1,1,8 tells the program to look for palindromes and only search the forward
+strand. Depending on your data, you may want to increase or decrease the number of 
+burn in and sampling iterations.  
+
+Newberg, L. A., McCue, L. A., and Lawrence, C. E. (2005). The Relative Inefficiency 
+of Sequence Weights Approaches in Determining a Nucleotide Position Weight Matrix. 
+Statistical Applications in Genetics and Molecular Biology 4, 1-18.
+
+Newberg, L. A., Thompson, W. A., Conlan, S., Smith, T. M., McCue, L. A., and Lawrence, 
+C. E. (2007). A phylogenetic Gibbs sampler that yields centroid solutions for 
+cis regulatory site prediction. Bioinformatics, btm241.
+
+Here's a sample prior file:
+
+
+! this command describes the probability of 0 through 4 sites in each sequence
+>BLOCKS 1 1
+0.2 0.2 0.2 0.2 0.2
+>
+
+! Uniform pseudocounts
+! One model, 16 bases wide - each position is multiplied by the value of
+! the -w parameter which defaults to 0.1
+! Since we're goung to use a plaindromic model, the pseudocound will be
+! doubled, i.e. there are 0.28 counts per nucleotide per position.
+
+>PSEUDO 1
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+1.40 1.40 1.40 1.40
+>
+
+! tree from /orthogibbs6/select_align/study72
+! based on all 72 intergenics
+>TREE 1 6
+((KPNE:0.32222,(ECOL:0.00601,SFLE:0.02473):0.14695):0.03788,((SBON:0.06927,SENT:0.08519):0.12679,CROD:0.14350):0.00000);
+>
+
+! weights for all sequences
+>WEIGHT
+1 0.3358
+2 0
+3 0.325724
+4 0.148832
+5 0.217804
+6 0.161971
+7 0.578202
+8 0.616242
+>
+
+
+Using the n-mer background. 
+
+Version 3.10 includes a new background model in
+addition to the default simple composition model and the heterogeneous 
+background model createdwith unifiedcpp. For each oligonucleotide in a set 
+of sequences  of length ranging from 6 to 10 nucleotides, a table of the 
+frequency of occurrence of the oligonucleotides can be precomputed for the 
+from the promoter or intergenic regions available. These precomputed 
+frequencies serve as the background model. For motif models longer than the 
+nucleotidelength, a Markov approximation is used (Pavesi et al. 2004). In 
+preliminary tests on a set of human promoter sequences with known regulatory 
+site positions, this technique shows improved sensitivity and improved 
+predictive power over using a simple compositional background model. 
+
+An n-mer background consists of a series of lines with consisting of an 
+oligonucleotide followed by a count of the number of occurances and a 
+probability for that oligonucleotide. 
+For example,
+AAAAAAAA	1467450	0.00096
+AAAAAAAC	160491	0.00011
+AAAAAAAG	224404	0.00014
+...
+
+The oligonucleotides may be in any order and the count value is ignored, so it can be set to 0. 
+
+A Perl program is included to create a background file from a set of sequences.
+To use it, run
+perl calc.nmer.prob.pl my_file.fa nmer_length > nmer.file
+my_file is a collection of sequences in Fasta format and nmer_length is an
+integer less than or equal to 10. The output will be written to nmer.file.
+The Perl program uses BioPerl.
+
+To use the file with Gibbs, add
+>NMER
+nmer.file
+>
+
+to your prior file. This option should be combined with the -F option.
+
+A good choice for background sequences might be a random collection of 
+promoters from teh species of choice.
+

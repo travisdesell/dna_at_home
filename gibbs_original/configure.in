@@ -1,0 +1,59 @@
+AC_PREREQ(2.59)
+
+AC_INIT([Gibbs], [3.1], [gibbs@brown.edu])
+
+AC_CANONICAL_SYSTEM
+
+AM_INIT_AUTOMAKE([1.9 foreign])
+
+MACFLAG=""
+case "$target_os" in
+  darwin* )	   MACFLAG="-Wno-long-double";;
+  rhapsody* )	   MACFLAG="-Wno-long-double";;
+esac
+
+AM_CONDITIONAL(CYGWIN, test x$OS = xWindows_NT)
+AM_CONDITIONAL(MPI, test "xyes" = "xno")
+
+AC_CHECK_LIB(sunmath, expl, HAVE_LIBSUNMATH=yes ; AC_DEFINE(HAVE_LIBSUNMATH),
+	HAVE_LIBSUNMATH=no)
+AM_CONDITIONAL(SUNMATH, test x$HAVE_LIBSUNMATH = xyes)
+
+CFLAGS="${CFLAGS=}"
+dnl this macro is used to get the arguments supplied
+dnl to the configure script (./configure --enable-debug)
+dnl Check if we have enable debug support.
+AC_MSG_CHECKING(whether to enable debugging/mpi)
+
+OPTFLAGS="-O3"
+MPIFLAGS=""
+COMP_LIST="gcc"
+
+AC_ARG_ENABLE(debug, 
+	[  --enable-debug=[no/yes] turn on debugging
+                     [default=no]],
+	[ if test "x$enableval" = "xyes"; then
+         	OPTFLAGS="-g -D_DEBUG_"
+	else
+        	OPTFLAGS="-O3"
+	fi
+	])
+
+AC_ARG_ENABLE(mpi, 
+	[  --enable-mpi=[no/yes] turn on MPI
+        	           [default=no]],
+	[ if test "x$enableval" = "xyes"; then
+        	MPIFLAGS="-D_MPI_ -D_MPI_INC_"
+	 	COMP_LIST="mpicc"
+                AM_CONDITIONAL(MPI, true)
+	else
+        	MPIFLAGS=""
+	fi
+	])
+
+CFLAGS="$OPTFLAGS $MPIFLAGS  -Wall -Werror $MACFLAG"
+
+AC_PROG_CC([$COMP_LIST])
+
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
