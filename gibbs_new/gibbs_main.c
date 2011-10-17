@@ -255,10 +255,12 @@ int main(int number_arguments, char** arguments) {
      * do the burn in walk
      */
 
-    fprintf(stderr, "<current_sites>\n");
-    fprintf(stderr,"<iteration>0</iteration>\n");
-    write_sites_to_file(stderr, ".\n");
-    fprintf(stderr, "</current_sites>\n");
+    if (print_current_sites_frequency > 0) {
+        fprintf(stderr, "<current_sites>\n");
+        fprintf(stderr,"<iteration>0</iteration>\n");
+        write_sites_to_file(stderr, ".\n");
+        fprintf(stderr, "</current_sites>\n");
+    }
 
     for (i = iteration; i < burn_in_period + sample_period; i++) {
 
@@ -355,7 +357,7 @@ int main(int number_arguments, char** arguments) {
 #endif
         }
 
-        if (((i+1) % print_current_sites_frequency) == 0) {
+        if (print_current_sites_frequency > 0 && (((i+1) % print_current_sites_frequency) == 0)) {
             fprintf(stderr, "<current_sites>\n");
             fprintf(stderr,"<iteration>%d</iteration>\n", i + 1);
             write_sites_to_file(stderr, ".\n");
