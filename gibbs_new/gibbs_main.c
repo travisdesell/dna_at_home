@@ -61,7 +61,7 @@ int main(int number_arguments, char** arguments) {
     Sample **current_sample;
     double *blocks;
     double count_percentage;
-    int print_current_sites, print_accumulated_samples;
+    int print_current_sites, print_accumulated_samples, print_current_sites_frequency;
     double print_best_sites;
     double progress;
     int total_number_nucleotides;
@@ -86,6 +86,7 @@ int main(int number_arguments, char** arguments) {
     shift_period = -1;
     print_best_sites = 0.0;
     print_current_sites = 0;
+    print_current_sites_frequency = 0;
     print_accumulated_samples = 0;
     max_sites = -1;
     iteration = 0;
@@ -126,6 +127,9 @@ int main(int number_arguments, char** arguments) {
 
         } else if (!strcmp(arguments[i], "--print_current_sites")) {
             print_current_sites = 1;
+
+        } else if (!strcmp(arguments[i], "--print_current_sites_frequency")) {
+            print_current_sites_frequency = atoi(arguments[++i]);
 
         } else if (!strcmp(arguments[i], "--print_accumulated_samples")) {
             print_accumulated_samples = 1;
@@ -250,6 +254,12 @@ int main(int number_arguments, char** arguments) {
     /**
      * do the burn in walk
      */
+
+    fprintf(stderr, "<current_sites>\n");
+    fprintf(stderr,"<iteration>0</iteration>\n");
+    write_sites_to_file(stderr, ".\n");
+    fprintf(stderr, "</current_sites>\n");
+
     for (i = iteration; i < burn_in_period + sample_period; i++) {
 
         if (i > 0 && shift_period > 0 && (i % shift_period) == 0) {
@@ -334,7 +344,7 @@ int main(int number_arguments, char** arguments) {
 //            boinc_checkpoint_completed();
 //        }
 //#else
-        if (i % 1000 == 0 && i != 0) {
+        if (i % 5000 == 0 && i != 0) {
             write_sites(SITES_CHECKPOINT_FILE, seed, i + 1);
             
             if (i >= burn_in_period) write_accumulated_samples(SAMPLES_CHECKPOINT_FILE);
@@ -344,6 +354,14 @@ int main(int number_arguments, char** arguments) {
             boinc_checkpoint_completed();
 #endif
         }
+
+        if (((i+1) % print_current_sites_frequency) == 0) {
+            fprintf(stderr, "<current_sites>\n");
+            fprintf(stderr,"<iteration>%d</iteration>\n", i + 1);
+            write_sites_to_file(stderr, ".\n");
+            fprintf(stderr, "</current_sites>\n");
+        }
+
 //#endif
     }
 
