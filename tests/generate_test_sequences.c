@@ -2,7 +2,6 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
-#include <math.h>
 #include "../../mersenne_twister/dSFMT.h"
 
 #define MODEL_TYPE_NORMAL 0
