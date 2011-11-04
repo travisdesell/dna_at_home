@@ -49,7 +49,7 @@ class Sequence {
 
         vector< vector<long> > accumulated_samples;
 
-        Sequence(string sequence_information, string nucleotides, int max_sites, int number_motifs);
+        Sequence(string sequence_information, string nucleotides, int max_sites, int number_motifs, int max_shift_distance);
 
         int possible_end_position(MotifModel &motif_model, unsigned int position);
 
@@ -68,7 +68,7 @@ class Sequence {
         void resample_from_models(vector<MotifModel> &motif_models);
 };
 
-void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs);
+void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance);
 void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences);
 void calculate_background_site_probabilities(vector<Sequence> &sequence);
 

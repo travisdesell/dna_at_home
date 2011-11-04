@@ -1,6 +1,11 @@
 #include <iostream>
 #include <vector>
 
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+
+
 #ifdef _WIN32
     #include "boinc_win.h"
     #include "str_util.h"
@@ -34,21 +39,30 @@
 
 using namespace std;
 
-int max_sites;
-
-int number_sequences;
-int max_shift_distance;
-
 double background_nucleotide_probability[ALPHABET_LENGTH];
 
 double foreground_pseudocounts = 0.28;
 double background_pseudocounts = 5.0;
 
+void handler(int sig) {
+    void *array[30];
+    size_t size;
 
-int number_motifs;
-MotifModel **motif_models;
+    // get void*'s for all entries on the stack
+    size = backtrace(array, 30);
+
+    // print out all the frames to stderr
+    fprintf(stderr, "Error: signal %d:\n", sig);
+    backtrace_symbols_fd(array, size, 2);
+    exit(1);
+}
+
 
 int main(int argc, char** argv) {
+    signal(SIGSEGV, handler);   // install our handler
+    signal(SIGTERM, handler);
+    signal(SIGABRT, handler);
+
     int retval;
     double count_percentage;
     double progress;
@@ -125,14 +139,14 @@ int main(int argc, char** argv) {
         }
     } else {
         for (int j = 0; j < max_sites + 1; j++) blocks.push_back(1.0 / ((double)max_sites + 1.0));
+        cerr << "generating blocks:";
+        for (unsigned int i = 0; i < blocks.size(); i++) cerr << " " << blocks.at(i);
+        cerr << endl;
     }
 
-    cerr << "blocks:";
-    for (unsigned int i = 0; i < blocks.size(); i++) cerr << " " << blocks.at(i);
-    cerr << endl;
-
     vector<Sequence> sequences;
-    read_sequences(sequences, sequence_file, max_sites, motif_info.size() /*motif_info.size() is the number of motifs*/);
+    read_sequences(sequences, sequence_file, max_sites, motif_info.size() /*motif_info.size() is the number of motifs*/, max_shift_distance);
+
     /**
      *  Calculate the background probabilities since we only need to do this once.
      */
@@ -229,7 +243,6 @@ int main(int argc, char** argv) {
         }
 
         for (int i = iteration; i < burn_in_period + sample_period; i++) {
-
             if (i > 0 && shift_period > 0 && (i % shift_period) == 0) attempt_shifting(max_shift_distance, sequences, motif_models);
 
             for (unsigned int j = 0; j < sequences.size(); j++) {
@@ -241,7 +254,7 @@ int main(int argc, char** argv) {
                  * we can do this by decrementing the counts of the left-out sequence, and recalculating the models
                  */
                 decrement_counts(motif_models, *sequence);
-               
+
                 /**
                  * update the models
                  */
@@ -262,24 +275,24 @@ int main(int argc, char** argv) {
                 /**
                  * update the models
                  */
-                update_motif_models(motif_models);
+                update_motif_models(motif_models); //probably do not need to do this
 
                 if (i >= burn_in_period) {
                     //add the samples taken this iteration to the saved samples
-
                     for (unsigned int k = 0; k < current_samples->size(); k++) {
                         if (current_samples->at(k).end_position < 0 || current_samples->at(k).motif_model < 0) continue;
-                        sequence->accumulated_samples.at(current_samples->at(k).motif_model).at(current_samples->at(k).end_position)++;
+
+                        (sequence->accumulated_samples.at(current_samples->at(k).motif_model).at(current_samples->at(k).end_position))++;
                     }
                 }
-            
+
                 progress = ((double)i)/((double)(burn_in_period + sample_period));
-                progress += (((double)j)/((double)number_sequences) * (1.0/((double)(burn_in_period + sample_period))));
+                progress += (((double)j)/((double)sequences.size()) * (1.0/((double)(burn_in_period + sample_period))));
 
 #ifdef _BOINC_
                 boinc_fraction_done(progress);
 #else
-//                fprintf(stdout, "\r%lf", progress);
+                cout << "\r" << progress;
 #endif
             }
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "structs.hpp"
 #include "sampling.hpp"
 #include "motif_models.hpp"
 #include "sequences.hpp"

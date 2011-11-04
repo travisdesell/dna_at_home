@@ -23,6 +23,8 @@ MotifModel::MotifModel(string motif_info) {
     int comma_pos = motif_info.find(',');
     string type_string = motif_info.substr(0, comma_pos);
 
+    cerr << "creating model from '" << motif_info << "'" << endl;
+
     string tmp = motif_info.substr(comma_pos + 1, motif_info.size() - (comma_pos + 1));
 
     if ( ! (stringstream(tmp) >> motif_width) ) {
@@ -30,6 +32,8 @@ MotifModel::MotifModel(string motif_info) {
         cerr << "\tcould not parse motif width." << endl;
         exit(0);
     }
+
+    cerr << "type_string: " << type_string << ", motif_width: " << motif_width << endl;
 
     if (type_string.compare("normal") == 0) {
         type = MODEL_TYPE_NORMAL;
@@ -45,7 +49,7 @@ MotifModel::MotifModel(string motif_info) {
         exit(0);
     }
 
-    counts = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
+    counts = vector< vector<long> >(motif_width, vector<long>(ALPHABET_LENGTH, 0));
     nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
     reverse_nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
 }
@@ -54,7 +58,7 @@ MotifModel::MotifModel(int _type, int _motif_width) {
     type = _type;
     motif_width = _motif_width; 
 
-    counts = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
+    counts = vector< vector<long> >(motif_width, vector<long>(ALPHABET_LENGTH, 0));
     nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
     reverse_nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
 }
@@ -68,7 +72,7 @@ void MotifModel::zero_counts() {
     }
 }
 
-void MotifModel::increment_counts_for_sample(Sequence &sequence, Sample &sample) {
+void MotifModel::increment_counts_for_sample(const Sequence &sequence, const Sample &sample) {
     int position, end_position;
     char nucleotide;
 
@@ -90,27 +94,27 @@ void MotifModel::increment_counts_for_sample(Sequence &sequence, Sample &sample)
             case 'T': counts.at(position).at(T_POSITION)++; break;
 
             default:
-                      cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence.name << "][" << sequence.nucleotides << "][" << sequence.nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
-                      cerr << "sample->end_position [" << sample.end_position << "], motif_width [" << motif_width <<  "]" << endl;
+                    cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence.name << "][" << sequence.nucleotides << "][" << sequence.nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
+                    cerr << "sample->end_position [" << sample.end_position << "], motif_width [" << motif_width <<  "]" << endl;
 
-                        cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
-                      cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
+                    cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
+                    cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
         }
     }
 }
 
-void MotifModel::increment_model_counts(Sequence &sequence, vector<Sample> &samples, int motif_model_number) {
+void MotifModel::increment_model_counts(const Sequence &sequence, const vector<Sample> &samples, int motif_model_number) {
     for (unsigned int i = 0; i < samples.size(); i++) {
-        Sample *sample = &(sequence.sampled_sites.at(i));
+        const Sample *sample = &(samples.at(i));
         if (sample->motif_model != motif_model_number) continue;
 
         increment_counts_for_sample(sequence, *sample);
     }
 }
 
-void increment_counts(vector<MotifModel> &motif_models, Sequence &sequence) {
+void increment_counts(vector<MotifModel> &motif_models, const Sequence &sequence) {
     for (unsigned int i = 0; i < sequence.sampled_sites.size(); i++) {
-        Sample *sample = &(sequence.sampled_sites.at(i));
+        const Sample *sample = &(sequence.sampled_sites.at(i));
 
         if (sample->motif_model < 0 || sample->end_position < 0) continue;
 
@@ -118,7 +122,7 @@ void increment_counts(vector<MotifModel> &motif_models, Sequence &sequence) {
     }
 }
 
-void decrement_counts(vector<MotifModel> &motif_models, Sequence &sequence) {
+void decrement_counts(vector<MotifModel> &motif_models, const Sequence &sequence) {
     char nucleotide;
     int position;
     int end_position;
@@ -153,16 +157,16 @@ void decrement_counts(vector<MotifModel> &motif_models, Sequence &sequence) {
                     cerr << "sample->end_position [" << sample.end_position << "], motif_width [" << motif_model->motif_width <<  "]" << endl;
 
                     cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
-                      cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
+                    cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
 
-                    cerr << "this a possible end position?" << sequence.possible_end_position(*motif_model, position) << endl;
+//                    cerr << "this a possible end position?" << sequence.possible_end_position(*motif_model, position) << endl;
 
             }
         }
     }
 }
 
-void copy_motif_model(MotifModel &source, MotifModel &destination) {
+void copy_motif_model(const MotifModel &source, MotifModel &destination) {
     int j, k;
 
     if (source.motif_width != destination.motif_width) {
@@ -173,8 +177,8 @@ void copy_motif_model(MotifModel &source, MotifModel &destination) {
 
     for (j = 0; j < source.motif_width; j++) {
         for (k = 0; k < ALPHABET_LENGTH; k++) {
-            destination.nucleotide_probabilities[j][k] = source.nucleotide_probabilities[j][k];
-            destination.counts[j][k] = source.counts[j][k];
+            destination.nucleotide_probabilities.at(j).at(k) = source.nucleotide_probabilities.at(j).at(k);
+            destination.counts.at(j).at(k) = source.counts.at(j).at(k);
         }
     }
 }
@@ -202,12 +206,12 @@ void update_motif_model_reverse_complement(MotifModel &forward_motif_model, Moti
         case MODEL_TYPE_FORWARD:
                 for (position = 0; position < forward_motif_model.motif_width; position++) {
 
-                    int forward_pos = forward_motif_model.motif_width - (position + 1);
+                    int reverse_pos = forward_motif_model.motif_width - (position + 1);
 
-                    count_a = foreground_pseudocounts + forward_motif_model.counts.at(position).at(A_POSITION) + reverse_motif_model.counts.at(forward_pos).at(A_POSITION_REVERSE);
-                    count_c = foreground_pseudocounts + forward_motif_model.counts.at(position).at(C_POSITION) + reverse_motif_model.counts.at(forward_pos).at(C_POSITION_REVERSE);
-                    count_g = foreground_pseudocounts + forward_motif_model.counts.at(position).at(G_POSITION) + reverse_motif_model.counts.at(forward_pos).at(G_POSITION_REVERSE);
-                    count_t = foreground_pseudocounts + forward_motif_model.counts.at(position).at(T_POSITION) + reverse_motif_model.counts.at(forward_pos).at(T_POSITION_REVERSE);
+                    count_a = foreground_pseudocounts + forward_motif_model.counts.at(position).at(A_POSITION) + reverse_motif_model.counts.at(reverse_pos).at(A_POSITION_REVERSE);
+                    count_c = foreground_pseudocounts + forward_motif_model.counts.at(position).at(C_POSITION) + reverse_motif_model.counts.at(reverse_pos).at(C_POSITION_REVERSE);
+                    count_g = foreground_pseudocounts + forward_motif_model.counts.at(position).at(G_POSITION) + reverse_motif_model.counts.at(reverse_pos).at(G_POSITION_REVERSE);
+                    count_t = foreground_pseudocounts + forward_motif_model.counts.at(position).at(T_POSITION) + reverse_motif_model.counts.at(reverse_pos).at(T_POSITION_REVERSE);
 
                     sum = count_a + count_c + count_g + count_t;
 
@@ -216,10 +220,10 @@ void update_motif_model_reverse_complement(MotifModel &forward_motif_model, Moti
                     forward_motif_model.nucleotide_probabilities.at(position).at(G_POSITION) = count_g / sum; 
                     forward_motif_model.nucleotide_probabilities.at(position).at(T_POSITION) = count_t / sum; 
 
-                    reverse_motif_model.nucleotide_probabilities.at(forward_pos).at(A_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(A_POSITION);
-                    reverse_motif_model.nucleotide_probabilities.at(forward_pos).at(C_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(C_POSITION);
-                    reverse_motif_model.nucleotide_probabilities.at(forward_pos).at(G_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(G_POSITION);
-                    reverse_motif_model.nucleotide_probabilities.at(forward_pos).at(T_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(T_POSITION);
+                    reverse_motif_model.nucleotide_probabilities.at(reverse_pos).at(A_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(A_POSITION);
+                    reverse_motif_model.nucleotide_probabilities.at(reverse_pos).at(C_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(C_POSITION);
+                    reverse_motif_model.nucleotide_probabilities.at(reverse_pos).at(G_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(G_POSITION);
+                    reverse_motif_model.nucleotide_probabilities.at(reverse_pos).at(T_POSITION_REVERSE) = forward_motif_model.nucleotide_probabilities.at(position).at(T_POSITION);
                 }
                 break;
 
@@ -279,10 +283,10 @@ void MotifModel::update_motif_model() {
                     nucleotide_probabilities.at(position).at(G_POSITION) = count_g / sum; 
                     nucleotide_probabilities.at(position).at(T_POSITION) = count_t / sum; 
 
-                    nucleotide_probabilities.at(pos).at(T_POSITION_REVERSE) = count_t / sum; 
-                    nucleotide_probabilities.at(pos).at(G_POSITION_REVERSE) = count_g / sum; 
-                    nucleotide_probabilities.at(pos).at(C_POSITION_REVERSE) = count_c / sum; 
-                    nucleotide_probabilities.at(pos).at(A_POSITION_REVERSE) = count_a / sum; 
+                    nucleotide_probabilities.at(pos).at(T_POSITION_REVERSE) = count_a / sum; 
+                    nucleotide_probabilities.at(pos).at(G_POSITION_REVERSE) = count_c / sum; 
+                    nucleotide_probabilities.at(pos).at(C_POSITION_REVERSE) = count_g / sum; 
+                    nucleotide_probabilities.at(pos).at(A_POSITION_REVERSE) = count_t / sum; 
 
 ////                    printf("probabilities: [%lf][%lf][%lf][%lf]\n", motif_model->nucleotide_probabilities[position][A_POSITION], motif_model->nucleotide_probabilities[position][C_POSITION], motif_model->nucleotide_probabilities[position][G_POSITION], motif_model->nucleotide_probabilities[position][T_POSITION]);
 

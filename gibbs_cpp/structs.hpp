@@ -20,6 +20,11 @@ using namespace std;
 #define G_POSITION_REVERSE 1
 #define T_POSITION_REVERSE 0
 
+#ifndef _DEBUG_
+#define at(x) operator[](x)
+#endif
+
+
 /**
  *  This is a prime example of why C sucks.  Can't have the structs spread out across multiple header files.
  */

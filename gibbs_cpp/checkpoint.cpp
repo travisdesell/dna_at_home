@@ -19,16 +19,6 @@
 #include "checkpoint.hpp"
 #include "sequences.hpp"
 
-
-extern int max_sites;
-
-extern int number_sequences;
-extern Sequence **sequences;
-
-extern int number_motifs;
-
-extern int ***accumulated_samples;
-
 void write_sites(string filename, const vector<Sequence> &sequences, int seed, int iteration, int independent_walk) {
 #ifdef _BOINC_
     string output_path;
@@ -114,16 +104,23 @@ int read_sites_from_checkpoint(string sites_filename, vector<Sequence> &sequence
         cerr << "ERROR: malformed sites checkpoint! could not read 'seed'" << endl;
         exit(0);
     }
+//    cerr << "seed: " << seed << endl;
+
     sites_file >> s >> iteration;
     if (s.compare("iteration:") != 0) {
         cerr << "ERROR: malformed sites checkpoint! could not read 'iteration'" << endl;
         exit(0);
     }
+//    cerr << "iteration: " << iteration << endl;
+
     sites_file >> s >> independent_walk;
     if (s.compare("independent_walk:") != 0) {
         cerr << "ERROR: malformed sites checkpoint! could not read 'independent_walk'" << endl;
         exit(0);
     }
+//    cerr << "independent_walk: " << independent_walk << endl;
+
+    getline(sites_file, s); //need this because the >> does not grab the newline
 
     read_sites_from_file(sites_file, sequences);
     return 1;
@@ -133,13 +130,17 @@ void read_sites_from_file(ifstream &sites_file, vector<Sequence> &sequences) {
     if (sites_file.is_open()) {
         string current_line;
         int current_sequence = 0;
-        while (sites_file.good()) {
+
+        getline(sites_file, current_line);
+        while (sites_file.good() && !sites_file.eof()) {
+//            cout << "current sequence: " << current_sequence << ", current line: " << current_line << endl;
             if (current_sequence >= (int)sequences.size()) {
                 cerr << "ERROR: sites_file contains sites for more sequences than in sequences file." << endl;
                 exit(0);
             }
-            getline(sites_file, current_line);
-            
+
+            sequences.at(current_sequence).sampled_sites.clear();
+
             int motif_number, end_position;
             stringstream ss(current_line);
             char c;
@@ -151,6 +152,7 @@ void read_sites_from_file(ifstream &sites_file, vector<Sequence> &sequences) {
                 if (c == '.') break;
             }
             current_sequence++;
+            getline(sites_file, current_line);
         }
         sites_file.close();
     }
@@ -161,7 +163,7 @@ void write_accumulated_samples_to_file(ostream &out, const vector<Sequence> &seq
         const Sequence *sequence = &(sequences.at(i));
         for (unsigned int j = 0; j < sequence->accumulated_samples.size(); j++) {
             out << sequence->accumulated_samples.at(j).at(0);
-            for (unsigned int k = 0; k < sequence->accumulated_samples.at(j).size(); k++) {
+            for (unsigned int k = 1; k < sequence->accumulated_samples.at(j).size(); k++) {
                 out << "," << sequence->accumulated_samples.at(j).at(k);
             }
             out << endl;
@@ -226,9 +228,13 @@ int read_accumulated_samples(string filename, vector<Sequence> &sequences) {
             copy(line.begin(), line.end(), line_c);
             line_c[line.size()] = '\0';
 
+//            cout << "current line: " << line_c << endl;
             char *token = strtok(line_c, ",\r\n");
 
-            for (unsigned int k = 0; k < sequence->accumulated_samples.at(i).size(); k++) {
+//            cout << "acc samples.at(j).size: " << sequence->accumulated_samples.at(j).size() << endl;
+//            cout << "sequence nucleotides size: " << sequence->nucleotides.size() << endl;
+
+            for (unsigned int k = 0; k < sequence->accumulated_samples.at(j).size(); k++) {
                 if (token == NULL) {
                     cerr << "ERROR: reading samples, token == NULL before all samples should have been read." << endl;
                     cerr << "loop i: [" << i << "], j: [" << j << "], k: [" << k << "]" << endl;

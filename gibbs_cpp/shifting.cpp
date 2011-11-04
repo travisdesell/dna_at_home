@@ -16,46 +16,35 @@ void initialize_shifting(vector<MotifModel> &motif_models) {
     /**
      *  Note that the number of shifted motif models is not the number of motifs -- we're having a different model for each shift possibility
      */
-    for (unsigned int i = 0; i < shifted_motif_models.size(); i++) {
-        shifted_motif_models.push_back( MotifModel(motif_models.at(i).motif_width, motif_models.at(i).type) );
+    for (unsigned int i = 0; i < motif_models.size(); i++) {
+        shifted_motif_models.push_back( MotifModel(motif_models.at(i).type, motif_models.at(i).motif_width) );
     }
 }
 
 void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences, vector<MotifModel> &motif_models) {
     Sample *sample, *shifted_sample, *adjacent_sample;
-    long double ratio;
-    long double rand;
     long double shifted_probability, unshifted_probability;
-    int print_ratio;
     int temp_model_type;
-
-    print_ratio = 0;
 
     MotifModel *shifted_motif_model = &(shifted_motif_models.at(motif_model));
 
     shifted_motif_model->zero_counts();
 
-//    printf("zeroed counts\n");
-
 //    printf("\n\nshift: %d\n", shift);
-    ratio = 0.0;
+
+    bool made_shift = false;
 
     for (unsigned int i = 0; i < sequences.size(); i++) {
-//        printf("shifting sequence: %d\n", i);
-
         Sequence *sequence = &(sequences[i]);
 
         for (unsigned int j = 0; j < sequence->sampled_sites.size(); j++) {
-            sample = &(sequence->sampled_sites[j]);
-            shifted_sample = &(sequence->shifted_sites[j]);
+            sample = &(sequence->sampled_sites.at(j));
+            if (sample->motif_model < 0) continue;
+            if (sample->motif_model != motif_model) continue;
 
+            shifted_sample = &(sequence->shifted_sites.at(j));
             shifted_sample->motif_model = sample->motif_model;
             shifted_sample->end_position = sample->end_position;
-
-//            printf("checking to see if shifted_sample->motif_model < 0: [%d]\n", shifted_sample->motif_model);
-
-            if (shifted_sample->motif_model < 0) continue;
-            if (shifted_sample->motif_model != motif_model) continue;
 
             shifted_sample->end_position += shift;
 
@@ -73,7 +62,7 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
             if (shift < 0 && j > 0) {
                 adjacent_sample = &(sequence->sampled_sites.at(j-1));
 
-                if (adjacent_sample->motif_model > 0 && motif_model != adjacent_sample->motif_model && (shifted_sample->end_position - motif_models.at(motif_model).motif_width) <= adjacent_sample->end_position) {
+                if (adjacent_sample->motif_model > 0 && (shifted_sample->end_position - motif_models.at(motif_model).motif_width) <= adjacent_sample->end_position) {
     //                printf("\nshift: %d, motif: %d\n", shift, motif_model);
     //                printf("not shifting because motif model [%d] != previous samples motif model [%d], and current samples end position - width [%d] <= previous samples end positon [%d]\n", motif_model, sequence->sampled_sites[j-1]->motif_model, shifted_sample->end_position - motif_width, sequence->sampled_sites[j-1]->end_position);
                     shifted_sample->end_position -= shift;
@@ -83,16 +72,21 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
             } else if (shift > 0 && j < (sequence->sampled_sites.size() - 1)) {
                 adjacent_sample = &(sequence->sampled_sites.at(j+1));
 
-                if (adjacent_sample->motif_model > 0 && motif_model != adjacent_sample->motif_model && shifted_sample->end_position > (adjacent_sample->end_position - motif_models.at(motif_model).motif_width)) {
+                if (adjacent_sample->motif_model > 0 && shifted_sample->end_position > (adjacent_sample->end_position - motif_models.at(motif_model).motif_width)) {
     //                printf("\nshift: %d, motif: %d\n", shift, motif_model);
     //                printf("not shifting because motif model [%d] != next samples motif model [%d], and current samples end position [%d] > next samples end positon - width [%d]\n", motif_model, sequence->sampled_sites[j+1]->motif_model, shifted_sample->end_position, sequence->sampled_sites[j+1]->end_position - motif_width);
                     shifted_sample->end_position -= shift;
                     continue; // we cant shift this site to the right because a site would overlap another site (if that was the same model, that would be shifted by the same amount)
                 }
             }
+            made_shift = true;
         }
     }
 
+    if (!made_shift) {
+//        cerr << "no changes made to sequence, was not possible to shift any samples." << endl;
+        return;
+    }
     //NEED TO UPDATE THE MOTIF MODEL
     for (unsigned int i = 0; i < sequences.size(); i++) {
         shifted_motif_model->increment_model_counts(sequences.at(i), sequences.at(i).shifted_sites, motif_model);
@@ -104,12 +98,11 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
     shifted_motif_model->update_motif_model();
     shifted_motif_model->type = temp_model_type;
 
-
 //    printf("\nSHIFT: %d\n", shift);
 //    printf("SHIFTED:\n");
-//    print_motif_model(shifted_motif_models[motif_model]);
+//    shifted_motif_models[motif_model].print(cerr);
 //    printf("\nUNSHIFTED:\n");
-//    print_motif_model(motif_models[motif_model]);
+//    motif_models[motif_model].print(cerr);
 
     shifted_probability = 0.0;
     unshifted_probability = 0.0;
@@ -140,7 +133,8 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
         }
     }
 
-    ratio = shifted_probability - unshifted_probability;
+    long double ratio = shifted_probability - unshifted_probability;
+    long double rand = 0;
 
     if (shifted_probability < unshifted_probability ) {
         /**
@@ -149,21 +143,39 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
          */
         ratio = exp(ratio);
         rand = (long double)dsfmt_gv_genrand_open_close();
-//        printf("moving to shift with probability: %.20Lf, rand: %.20Lf\n", ratio, rand);
 
         if (rand >= ratio) return; //don't make the shift
     }
+//  printf("moved to shift with probability: %.20Lf, rand: %.20Lf\n", ratio, rand);
+
+//    cout << "\nPERFORMING SHIFT of " << shift << "!\n" << endl;
 
     for (unsigned int i = 0; i < sequences.size(); i++) {
         Sequence *sequence = &(sequences.at(i));
 
         for (unsigned int j = 0; j < sequence->sampled_sites.size(); j++) {
-            sequence->sampled_sites[j].end_position = sequence->shifted_sites[j].end_position;
-            sequence->sampled_sites[j].motif_model = sequence->shifted_sites[j].motif_model;
+            if (sequence->shifted_sites.at(j).motif_model == motif_model) {
+  //              cout << endl << "shifted sequence->sampled_sites[j].end_position to: " << sequence->sampled_sites.at(j).end_position << " from " << sequence->shifted_sites.at(j).end_position << endl;
+ //               cout << "shifted sequence->sampled_sites[j].motif_model to: " << sequence->sampled_sites.at(j).motif_model << " from " << sequence->shifted_sites.at(j).motif_model << endl;
+ //               cout << "sequence->sampled_sites.size(): " << sequence->sampled_sites.size() << endl;
+ //               cout << "sequence->shifted_sites.size(): " << sequence->shifted_sites.size() << endl;
+                sequence->sampled_sites.at(j).end_position = sequence->shifted_sites.at(j).end_position;
+                sequence->sampled_sites.at(j).motif_model = sequence->shifted_sites.at(j).motif_model;
+            }
         }
     }
 
-    copy_motif_model(shifted_motif_models[motif_model], motif_models[motif_model]);
+//    cout << "copying motif models" << endl;
+
+//    cout << "shifted motif model:" << endl;
+//    shifted_motif_model->print(cout);
+//    cout << "motif model [" << motif_model << "]:" << endl;
+//    motif_models.at(motif_model).print(cout);
+
+    copy_motif_model(*shifted_motif_model, motif_models.at(motif_model));
+    /**
+     *  If a shift happens, we need to zero out the model counts and recalculate them.
+     */
 }
 
 void attempt_shifting(int max_shift_distance, vector<Sequence> &sequences, vector<MotifModel> &motif_models) {
@@ -182,7 +194,11 @@ void attempt_shifting(int max_shift_distance, vector<Sequence> &sequences, vecto
 //    printf("shifting: %d\n", shift);
 
     for (unsigned int i = 0; i < motif_models.size(); i++) {
-//        printf("shifting model: %d\n", i);
         attempt_model_shift(i, shift, sequences, motif_models);
     }
+
+    /**
+     *  Should call attempt model shift on the model itself
+     */
+
 }

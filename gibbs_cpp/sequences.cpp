@@ -19,8 +19,6 @@ using namespace std;
 
 extern double background_nucleotide_probability[ALPHABET_LENGTH];
 
-extern int max_shift_distance;
-
 extern double background_pseudocounts;
 
 int get_nucleotide_position(char nucleotide) {
@@ -45,7 +43,7 @@ int is_valid_nucleotide(char nucleotide) {
     }
 }
 
-Sequence::Sequence(string sequence_information, string _nucleotides, int max_sites, int number_motifs) {
+Sequence::Sequence(string sequence_information, string _nucleotides, int max_sites, int number_motifs, int max_shift_distance) {
     name = sequence_information;
     nucleotides = _nucleotides;
     distance_to_previous_invalid = vector<int>((int)nucleotides.size(), 0);
@@ -78,7 +76,7 @@ void Sequence::calculate_distance_to_invalid() {
         distance_to_previous_invalid.at(0) = 0;
     }
 
-    for (int i = 0; i < (int)distance_to_previous_invalid.size(); i++) {
+    for (unsigned int i = 1; i < distance_to_previous_invalid.size(); i++) {
         if (is_valid_nucleotide(nucleotides.at(i))) {
             distance_to_previous_invalid.at(i) = distance_to_previous_invalid.at(i-1) + 1;
         } else {
@@ -87,12 +85,20 @@ void Sequence::calculate_distance_to_invalid() {
     }
 }
 
-void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs) {
+void remove_carriage_return(string &s) {
+    for (string::iterator it = s.begin(); it < s.end(); it++) {
+        if (*it == '\r') s.erase(it);
+    }
+}
+
+void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance) {
     ifstream sequence_file(sequence_filename.c_str());
     if (sequence_file.is_open()) {
         string current_line;
 
-        while (sequence_file.good()) {
+        getline(sequence_file, current_line);
+        remove_carriage_return(current_line);
+        while (sequence_file.good() && !sequence_file.eof()) {
             /**
              *  File format is (for each sequence):
              *  >sequence information
@@ -101,18 +107,22 @@ void read_sequences(vector<Sequence> &sequences, string sequence_filename, int m
              *  NUCLEOTIDES
              *  <blank line>
              */
-            getline(sequence_file, current_line);
             string sequence_information = current_line;
 
             string nucleotides;
+            getline(sequence_file, current_line);
+            remove_carriage_return(current_line);
+//            cout << "next sequence line is: " << current_line << endl;
             do {
-                getline(sequence_file, current_line);
                 nucleotides += current_line;
+                getline(sequence_file, current_line);
+                remove_carriage_return(current_line);
 
-            } while (sequence_file.good() && current_line.compare("") != 0);
+//                cout << "next sequence line is: " << current_line << endl;
+            } while (sequence_file.good() && !sequence_file.eof() && current_line.compare("") != 0);
+//            cout << "finished reading nucleotides." << endl;
 
-
-            for (int i = 0; i < (int)nucleotides.size(); i++) {
+            for (unsigned int i = 0; i < nucleotides.size(); i++) {
                 /**
                  *  Convert the sequence to all uppercase
                  */
@@ -122,6 +132,9 @@ void read_sequences(vector<Sequence> &sequences, string sequence_filename, int m
                  *  Ensure that the sequence contains valid data
                  */
                 char c = nucleotides.at(i);
+//                if (c == '\r' || c == '\n') {
+//                    continue;
+//                }
                 if (c != 'A' && c != 'C' && c != 'G' && c != 'T' && c != 'X') {
                     cerr << "ERROR: reading sequence: " << sequence_information << endl;
                     cerr << "nucleotides: " << nucleotides << endl;
@@ -129,7 +142,12 @@ void read_sequences(vector<Sequence> &sequences, string sequence_filename, int m
                     exit(0);
                 }
             }
-            sequences.push_back( Sequence(sequence_information, nucleotides, max_sites, number_motifs) );
+            sequences.push_back( Sequence(sequence_information, nucleotides, max_sites, number_motifs, max_shift_distance) );
+//            cout << "pushed " << "nucleotides: [" << nucleotides << "], sequence_information: [" << sequence_information << "]" << endl;
+
+            getline(sequence_file, current_line);
+            remove_carriage_return(current_line);
+//            cout << "next sequence line is: " << current_line << endl;
         }
 
         sequence_file.close();
@@ -178,10 +196,10 @@ void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences) 
     background_nucleotide_probability[T_POSITION] = (double)(a_count + t_count) / (double)total;
 
     cerr << "background probabilities:" << endl;
-    cerr << "\tA: %lf" << background_nucleotide_probability[A_POSITION] << endl;
-    cerr << "\tC: %lf" << background_nucleotide_probability[C_POSITION] << endl;
-    cerr << "\tG: %lf" << background_nucleotide_probability[G_POSITION] << endl;
-    cerr << "\tT: %lf" << background_nucleotide_probability[T_POSITION] << endl;
+    cerr << "\tA:" << background_nucleotide_probability[A_POSITION] << endl;
+    cerr << "\tC:" << background_nucleotide_probability[C_POSITION] << endl;
+    cerr << "\tG:" << background_nucleotide_probability[G_POSITION] << endl;
+    cerr << "\tT:" << background_nucleotide_probability[T_POSITION] << endl;
 }
 
 
@@ -291,7 +309,7 @@ long double Sequence::foreground_probability(MotifModel &motif_model, int end_po
     end_position++;
     for (i = 0; i < motif_model.motif_width; i++) {
         position = end_position - motif_model.motif_width + i;
-        nucleotide_position = get_nucleotide_position( nucleotides[position] );
+        nucleotide_position = get_nucleotide_position( nucleotides.at(position) );
 
         probability *= motif_model.nucleotide_probabilities.at(i).at(nucleotide_position);
     }
@@ -341,10 +359,13 @@ void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, in
                 site_probability_ratio.at(i).at(j) = foreground_probability(*current_motif, j) / background_site_probability.at(i).at(j);
 
                 if (site_probability_ratio.at(i).at(j) < 0) {
-                    cerr << "ERROR: calculated site probability ratio < 0: file [" << __FILE__ << "] line [" << __LINE__ << endl;
+                    cerr << endl;
+                    cerr << "ERROR: calculated site probability ratio < 0: file [" << __FILE__ << "] line [" << __LINE__ << "]" << endl;
+                    cout << "motif_model: " << i << endl;
                     cerr << "sequence->site_probability_ratio[" << i << "][" << j << "]: " << site_probability_ratio.at(i).at(j) << endl;
                     cerr << "foreground_prob: " << foreground_probability(*current_motif, j) << ", background_prob: " << background_site_probability.at(i).at(j) << endl;
                     current_motif->print(cerr);
+                    exit(0);
                 }
             } else {
                 site_probability_ratio.at(i).at(j) = 0;
