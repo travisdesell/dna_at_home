@@ -406,10 +406,6 @@ int main(int number_arguments, char **arguments) {
             offset=0;
 
       for (j = 0; j < number_motifs; j++) {
-/*         if(MODEL_BUILD_PROBABILISTIC==motif_build)
-              (j>0) ? (offset=j*i) : (offset=i);
-         else
-               offset=0;*/
 
          if(start_position[i][j]>0)
             printf(", start pos [%d] subseq [%d][%s] end pos [%d]", start_position[i][j], j, motifs[j+offset], start_position[i][j] + motif_length - 1);
