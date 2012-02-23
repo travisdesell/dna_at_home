@@ -1,15 +1,20 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <fstream>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "../../mersenne_twister/dSFMT.h"
+
 #include "structs.hpp"
 #include "motif_models.hpp"
 #include "sequences.hpp"
 #include "sampling.hpp"
+
+using namespace std;
 
 extern double foreground_pseudocounts;
 
@@ -56,10 +61,20 @@ MotifModel::MotifModel(string motif_info) {
 
 MotifModel::MotifModel(int _type, int _motif_width) {
     type = _type;
-    motif_width = _motif_width; 
+    motif_width = _motif_width;
 
     counts = vector< vector<long> >(motif_width, vector<long>(ALPHABET_LENGTH, 0));
     nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
+    reverse_nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
+}
+
+MotifModel::MotifModel(int _type, vector< vector< double> > &_nucleotide_probabilities) {
+    type = _type;
+    motif_width = _nucleotide_probabilities.size();
+
+    nucleotide_probabilities = vector< vector<double> >(_nucleotide_probabilities);
+
+    counts = vector< vector<long> >(motif_width, vector<long>(ALPHABET_LENGTH, 0));
     reverse_nucleotide_probabilities = vector< vector<double> >(motif_width, vector<double>(ALPHABET_LENGTH, 0.0));
 }
 
@@ -72,7 +87,7 @@ void MotifModel::zero_counts() {
     }
 }
 
-void MotifModel::increment_counts_for_sample(const Sequence &sequence, const Sample &sample) {
+void MotifModel::increment_counts_for_sample(Sequence *sequence, const Sample &sample) {
     int position, end_position;
     char nucleotide;
 
@@ -80,12 +95,12 @@ void MotifModel::increment_counts_for_sample(const Sequence &sequence, const Sam
 
     if (end_position - motif_width < 0) {
         cerr << "ERROR (increment_counts): trying to read character with position < 0" << endl;
-        cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
+        cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
         exit(0);
     }
 
     for (position = 0; position < motif_width; position++) {
-        nucleotide = sequence.nucleotides.at(end_position - motif_width + position);
+        nucleotide = sequence->nucleotides.at(end_position - motif_width + position);
 
         switch (nucleotide) {
             case 'A': counts.at(position).at(A_POSITION)++; break;
@@ -94,16 +109,16 @@ void MotifModel::increment_counts_for_sample(const Sequence &sequence, const Sam
             case 'T': counts.at(position).at(T_POSITION)++; break;
 
             default:
-                    cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence.name << "][" << sequence.nucleotides << "][" << sequence.nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
+                    cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence->name << "][" << sequence->nucleotides << "][" << sequence->nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
                     cerr << "sample->end_position [" << sample.end_position << "], motif_width [" << motif_width <<  "]" << endl;
 
-                    cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
+                    cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
                     cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
         }
     }
 }
 
-void MotifModel::increment_model_counts(const Sequence &sequence, const vector<Sample> &samples, int motif_model_number) {
+void MotifModel::increment_model_counts(Sequence *sequence, const vector<Sample> &samples, int motif_model_number) {
     for (unsigned int i = 0; i < samples.size(); i++) {
         const Sample *sample = &(samples.at(i));
         if (sample->motif_model != motif_model_number) continue;
@@ -112,9 +127,9 @@ void MotifModel::increment_model_counts(const Sequence &sequence, const vector<S
     }
 }
 
-void increment_counts(vector<MotifModel> &motif_models, const Sequence &sequence) {
-    for (unsigned int i = 0; i < sequence.sampled_sites.size(); i++) {
-        const Sample *sample = &(sequence.sampled_sites.at(i));
+void increment_counts(vector<MotifModel> &motif_models, Sequence *sequence) {
+    for (unsigned int i = 0; i < sequence->sampled_sites.size(); i++) {
+        const Sample *sample = &(sequence->sampled_sites.at(i));
 
         if (sample->motif_model < 0 || sample->end_position < 0) continue;
 
@@ -122,13 +137,13 @@ void increment_counts(vector<MotifModel> &motif_models, const Sequence &sequence
     }
 }
 
-void decrement_counts(vector<MotifModel> &motif_models, const Sequence &sequence) {
+void decrement_counts(vector<MotifModel> &motif_models, Sequence *sequence) {
     char nucleotide;
     int position;
     int end_position;
 
-    for (unsigned int i = 0; i < sequence.sampled_sites.size(); i++) {
-        Sample sample = sequence.sampled_sites.at(i);
+    for (unsigned int i = 0; i < sequence->sampled_sites.size(); i++) {
+        Sample sample = sequence->sampled_sites.at(i);
 
         if (sample.motif_model < 0 || sample.end_position < 0) continue;
 
@@ -137,12 +152,12 @@ void decrement_counts(vector<MotifModel> &motif_models, const Sequence &sequence
 
         if (end_position - motif_model->motif_width < 0) {
             cerr << "ERROR (decrement_counts): trying to read character with position < 0" << endl;
-            cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
+            cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
             exit(0);
         }
 
         for (position = 0; position < motif_model->motif_width; position++) {
-            nucleotide = sequence.nucleotides.at(end_position - motif_model->motif_width + position);
+            nucleotide = sequence->nucleotides.at(end_position - motif_model->motif_width + position);
 
     //        printf("incrementing count for position [%d] for nucleotide [%c]\n", position, nucleotide);
 
@@ -153,13 +168,13 @@ void decrement_counts(vector<MotifModel> &motif_models, const Sequence &sequence
                 case 'T': motif_model->counts.at(position).at(T_POSITION)--; break;
 
                 default:
-                    cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence.name << "][" << sequence.nucleotides << "][" << sequence.nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_model->motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
+                    cerr << "ERROR (increment_model_counts): unknown character found in sequence " << sequence->name << "][" << sequence->nucleotides << "][" << sequence->nucleotides.size() << "] at position [" << position << "] nucleotide position [" << (end_position - motif_model->motif_width + position) << "] -- [" << nucleotide << "] [" << (int)nucleotide << "]" << endl;
                     cerr << "sample->end_position [" << sample.end_position << "], motif_width [" << motif_model->motif_width <<  "]" << endl;
 
-                    cerr << "subsequence examined [" << sequence.nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
+                    cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
                     cerr << "Error in file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
 
-//                    cerr << "this a possible end position?" << sequence.possible_end_position(*motif_model, position) << endl;
+//                    cerr << "this a possible end position?" << sequence->possible_end_position(*motif_model, position) << endl;
 
             }
         }
@@ -267,7 +282,7 @@ void MotifModel::update_motif_model() {
 
         case MODEL_TYPE_PALINDROMIC:
                 for (position = 0; position < (motif_width / 2); position++) {
-//                    printf("calculating palindromic probability for position [%d] and [%d]\n", position, (motif_model->motif_width - (position + 1)));
+//                    printf("calculating palindromic probability for position [%d] and [%d]\n", position, (motif_width - (position + 1)));
 
 //                    printf("foreground_pseudocounts: %lf\n", foreground_pseudocounts);
                     int pos = motif_width - (position + 1);
@@ -283,10 +298,10 @@ void MotifModel::update_motif_model() {
                     nucleotide_probabilities.at(position).at(G_POSITION) = count_g / sum; 
                     nucleotide_probabilities.at(position).at(T_POSITION) = count_t / sum; 
 
-                    nucleotide_probabilities.at(pos).at(T_POSITION_REVERSE) = count_a / sum; 
-                    nucleotide_probabilities.at(pos).at(G_POSITION_REVERSE) = count_c / sum; 
-                    nucleotide_probabilities.at(pos).at(C_POSITION_REVERSE) = count_g / sum; 
-                    nucleotide_probabilities.at(pos).at(A_POSITION_REVERSE) = count_t / sum; 
+                    nucleotide_probabilities.at(pos).at(A_POSITION_REVERSE) = count_a / sum; 
+                    nucleotide_probabilities.at(pos).at(C_POSITION_REVERSE) = count_c / sum; 
+                    nucleotide_probabilities.at(pos).at(G_POSITION_REVERSE) = count_g / sum; 
+                    nucleotide_probabilities.at(pos).at(T_POSITION_REVERSE) = count_t / sum; 
 
 ////                    printf("probabilities: [%lf][%lf][%lf][%lf]\n", motif_model->nucleotide_probabilities[position][A_POSITION], motif_model->nucleotide_probabilities[position][C_POSITION], motif_model->nucleotide_probabilities[position][G_POSITION], motif_model->nucleotide_probabilities[position][T_POSITION]);
 
@@ -318,10 +333,14 @@ void MotifModel::update_motif_model() {
     }
 }
 
+void MotifModel::print_short(ostream &out_stream) {
+    out_stream << MODEL_TYPES[type] << "," << motif_width;
+}
+
 void MotifModel::print(ostream &out_stream) {
     int j, k;
 
-    out_stream << "Model type: " << type << endl;
+    out_stream << "Model type: " << MODEL_TYPES[type] << endl;
     out_stream << "Model length: " << motif_width << endl;
 
     for (j = 0; j < ALPHABET_LENGTH; j++) {
@@ -345,6 +364,114 @@ void MotifModel::print(ostream &out_stream) {
     out_stream << endl;
 }
 
+string MotifModel::generate_possible_nucleotides() {
+    string s = "";
 
+    for (int i = 0; i < motif_width; i++) {
+        double value = dsfmt_gv_genrand_open_close();
 
+        if (value < nucleotide_probabilities.at(i).at(A_POSITION)) {
+            s.append("A");
+        } else {
+            value -= nucleotide_probabilities.at(i).at(A_POSITION);
+            if (value < nucleotide_probabilities.at(i).at(C_POSITION)) {
+                s.append("C");
+            } else {
+                value -= nucleotide_probabilities.at(i).at(C_POSITION);
+                if (value < nucleotide_probabilities.at(i).at(G_POSITION)) {
+                    s.append("G");
+                } else {
+                    value -= nucleotide_probabilities.at(i).at(G_POSITION);
+                    if (value < nucleotide_probabilities.at(i).at(T_POSITION)) {
+                        s.append("T");
+                    } else {
+                        cerr << "ERROR(" << __FILE__ << "," << __LINE__ << "): could not generate possible nucleotides for motif: " << endl;
+                        print(cerr);
+                        cerr << endl << "random value to choose nucleotide " << i << " did not select any random nucleotide (chances are the nucleotide probabilities did not sum to 1" << endl;
+                        exit(0);
+                    }                  
+                }                  
+            } 
+        }
+    }
 
+    return s;
+}
+
+void read_motifs_from_file(string filename, vector<MotifModel> &motif_models) {
+    ifstream in(filename.c_str());
+
+    int type = -1;
+
+    while (in.good() && !in.eof()) {
+        bool is_reverse_complement = false;
+        string line;
+        getline(in, line);
+//        cout << "type line: " << line << endl;
+
+        if (line.compare(">reverse_complement") == 0) {
+            is_reverse_complement = true;
+            type = MODEL_TYPE_FORWARD;
+        } else if (line.compare(">palindromic") == 0) {
+            type = MODEL_TYPE_PALINDROMIC;
+        } else if (line.compare(">forward") == 0) {
+            type = MODEL_TYPE_FORWARD;
+        } else if (line.compare(">reverse") == 0) {
+            type = MODEL_TYPE_REVERSE;
+        }
+
+        vector< vector<double> > nucleotide_probabilities;
+        vector< vector<double> > reverse_nucleotide_probabilities;
+
+        int previous_width = 0;
+        for (int i = 0; i < ALPHABET_LENGTH; i++) {
+            getline(in, line);
+//            cout << "read line: " << line << endl;
+            istringstream iss(line);
+
+            int current = 0;
+            while (iss.good() && !iss.eof()) {
+                if (i == 0) nucleotide_probabilities.push_back( vector<double>(ALPHABET_LENGTH, 0.0) );
+
+                double value;
+                iss >> value;
+//                cout << "value: " << value << endl;
+                
+                nucleotide_probabilities.at(current).at(i) = value;
+                current++;
+            }
+            if (i > 0) {
+                if (current != previous_width) {
+                    cerr << "ERROR(" << __FILE__ << ", " << __LINE__ << "): reading motif from file, different widths for nucleotides" << endl;
+                    cerr << "  current line: '" << line << "' has " << current << " nucleotides." << endl;
+                    cerr << "  previous line had " << previous_width << " nucleotides." << endl;
+                    exit(0);
+                }
+            }
+            previous_width = current;
+        }
+
+        motif_models.push_back( MotifModel(type, nucleotide_probabilities) );
+//        motif_models.back().print(cout);
+
+        if (is_reverse_complement) {
+            reverse_nucleotide_probabilities = vector< vector<double> >(nucleotide_probabilities.size(), vector<double>(ALPHABET_LENGTH, 0.0));
+
+            int i_size = nucleotide_probabilities.size();
+            for (int i = i_size - 1; i >= 0; i--) {
+                int j_size = nucleotide_probabilities.at(i).size();
+                for (int j = j_size - 1; j >= 0; j--) {
+                    int rev_i = (i_size - 1) - i;
+                    int rev_j = (j_size - 1) - j;
+//                    cout << "setting " << i << "," << j << " set to " << rev_i << "," << rev_j << endl;
+                    reverse_nucleotide_probabilities.at(i).at(j) = nucleotide_probabilities.at(rev_i).at(rev_j);
+                }
+            }
+
+            motif_models.push_back( MotifModel(MODEL_TYPE_REVERSE, reverse_nucleotide_probabilities) );
+//            motif_models.back().print(cout);
+        }
+
+        getline(in, line);
+    }
+}

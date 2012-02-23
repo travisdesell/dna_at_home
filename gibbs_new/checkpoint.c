@@ -240,7 +240,7 @@ int read_sites_from_checkpoint(const char *filename, int *seed, int *iteration) 
 #endif
 
     if (checkpoint_file == NULL) {
-        printf("sites checkpoint file was null\n");
+//        printf("sites checkpoint file was null\n");
         //No checkpoint was found
         return 0;
     }

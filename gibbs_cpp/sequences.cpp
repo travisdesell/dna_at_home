@@ -14,12 +14,14 @@
 #include "motif_models.hpp"
 
 #include "sequences.hpp"
+#include "util.hpp"
 
 using namespace std;
 
-extern double background_nucleotide_probability[ALPHABET_LENGTH];
+double background_nucleotide_probability[ALPHABET_LENGTH];
 
-extern double background_pseudocounts;
+double foreground_pseudocounts = 0.28;
+double background_pseudocounts = 5.0;
 
 int get_nucleotide_position(char nucleotide) {
     switch (nucleotide) {
@@ -91,7 +93,7 @@ void remove_carriage_return(string &s) {
     }
 }
 
-void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance) {
+void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance) {
     ifstream sequence_file(sequence_filename.c_str());
     if (sequence_file.is_open()) {
         string current_line;
@@ -142,7 +144,7 @@ void read_sequences(vector<Sequence> &sequences, string sequence_filename, int m
                     exit(0);
                 }
             }
-            sequences.push_back( Sequence(sequence_information, nucleotides, max_sites, number_motifs, max_shift_distance) );
+            sequences->push_back( new Sequence(sequence_information, nucleotides, max_sites, number_motifs, max_shift_distance) );
 //            cout << "pushed " << "nucleotides: [" << nucleotides << "], sequence_information: [" << sequence_information << "]" << endl;
 
             getline(sequence_file, current_line);
@@ -157,7 +159,7 @@ void read_sequences(vector<Sequence> &sequences, string sequence_filename, int m
     }
 }
 
-void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences) {
+void calculate_background_nucleotide_probabilities(vector<Sequence*> *sequences) {
     int total, a_count, c_count, g_count, t_count;
 
     total = background_pseudocounts + background_pseudocounts +  background_pseudocounts + background_pseudocounts;
@@ -166,11 +168,11 @@ void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences) 
     g_count = background_pseudocounts;
     t_count = background_pseudocounts;
 
-    for (int i = 0; i < (int)sequences.size(); i++) {
-        Sequence current_sequence = sequences.at(i);
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence* current_sequence = sequences->at(i);
 
-        for (int j = 0; j < (int)current_sequence.nucleotides.size(); j++) {
-            switch (current_sequence.nucleotides.at(j)) {
+        for (unsigned int j = 0; j < current_sequence->nucleotides.size(); j++) {
+            switch (current_sequence->nucleotides.at(j)) {
                 case 'A': a_count++;
                           total++;
                           break;
@@ -190,10 +192,10 @@ void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences) 
         }
     }
 
-    background_nucleotide_probability[A_POSITION] = (double)(a_count + t_count) / (double)total;
-    background_nucleotide_probability[C_POSITION] = (double)(c_count + g_count) / (double)total;
-    background_nucleotide_probability[G_POSITION] = (double)(c_count + g_count) / (double)total;
-    background_nucleotide_probability[T_POSITION] = (double)(a_count + t_count) / (double)total;
+    background_nucleotide_probability[A_POSITION] = ((double)(a_count + t_count) / 2.0) / (double)total;
+    background_nucleotide_probability[C_POSITION] = ((double)(c_count + g_count) / 2.0) / (double)total;
+    background_nucleotide_probability[G_POSITION] = ((double)(c_count + g_count) / 2.0) / (double)total;
+    background_nucleotide_probability[T_POSITION] = ((double)(a_count + t_count) / 2.0) / (double)total;
 
     cerr << "background probabilities:" << endl;
     cerr << "\tA:" << background_nucleotide_probability[A_POSITION] << endl;
@@ -206,14 +208,14 @@ void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences) 
 /**
  *  This counts the number of possible ways to generate 0...max_sites within a sequence
  */
-void calculate_site_counts(vector<Sequence> &sequences, vector<MotifModel> &motif_models, vector<double> &blocks, int max_sites) {
+void calculate_site_counts(vector<Sequence*> *sequences, vector<MotifModel> &motif_models, vector<double> &blocks, int max_sites) {
     Sequence *current_sequence;
     MotifModel *current_motif_model;
 
 //    printf("calculating counts\n");
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        current_sequence = &(sequences.at(i));
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        current_sequence = sequences->at(i);
 
         for (int j = 0; j < max_sites; j++) {
 
@@ -277,7 +279,7 @@ void calculate_site_counts(vector<Sequence> &sequences, vector<MotifModel> &moti
     }
 }
 
-long double Sequence::background_probability(double *background_nucleotide_probability, MotifModel &motif_model, int end_position) {
+long double Sequence::background_probability(double *bg_nucleotide_prob, MotifModel &motif_model, int end_position) {
     int i;
     int position;
     int nucleotide_position;
@@ -291,8 +293,72 @@ long double Sequence::background_probability(double *background_nucleotide_proba
         position = end_position - motif_model.motif_width + i;
         nucleotide_position = get_nucleotide_position( nucleotides[position] );
 
-        probability *= background_nucleotide_probability[nucleotide_position];
+        probability *= bg_nucleotide_prob[nucleotide_position];
     }
+
+    return probability;
+}
+
+long double Sequence::foreground_probability_phylogeny(MotifModel &motif_model, int end_position, PhylogenyTree *phylogeny_tree) {
+    int position;
+    int nucleotide_position;
+    long double probability, reverse_probability;
+
+    probability = 1.0;
+    reverse_probability = 1.0;
+
+    end_position++;
+    for (int i = 0; i < motif_model.motif_width; i++) {
+        position = end_position - motif_model.motif_width + i;
+        nucleotide_position = get_nucleotide_position( nucleotides.at(position) );
+
+        vector<double> *background_equilibrium = new vector<double>(background_nucleotide_probability, background_nucleotide_probability + 4);
+        vector<double> *foreground_equilibrium = new vector<double>(motif_model.nucleotide_probabilities.at(i).begin(), motif_model.nucleotide_probabilities.at(i).end());
+        /**
+         *  
+         *  Using phylogeny tree:
+         *      for foreground:
+         *          SubstitutionMatrix.setEquilibriumAndTTFactor( equilibrium = background [A T C G], TTFactor = 3 (maybe command line) )
+         *          SubstitutionMatrix.setHB98Foreground( equilibrium_fg = [motif_model.probabilities.at(A_POSITION) motif_model.probabilities.at(T_POSITION) motif_model.probabilities.at(C_POSITION) motif_model.probabilities.at(G_POSITION)] )
+         *
+         *      then recursively:
+         *          getSubstitutionMatrix(time_child1, response_child1);
+         *          getSubstitutionMatrix(time_child2, response_child2);
+         *          getSubstitutionMatrix(time_child3, response_child3);
+         *          ...
+         *
+         *          prob_vector[i] =   (response_child1[i] * prob_vector_child1) |this is matrix multiplication| 
+         *                           * (response_child2[i] * prob_vector_child2) |this is matrix multiplication|
+         *                           * (response_child3[i] * prob_vector_child3) |this is matrix multiplication|
+         *                           * ...
+         *
+         *      then:
+         *          fg_prob = root_prob_vector[0] * equilibrium_fg[0] + root_prob_vector[1] * equilibrium_fg[1] + ...
+         *
+         *********************************
+         *
+         *      for bacgkround:
+         *          SubstitutionMatrix.setEquilibriumAndTTFactor( equilibrium = background [A T C G], TTFactor = 3 (maybe command line) )
+         *          ONLY
+         *
+         *      same recursion:
+         *
+         *      then (dot product):
+         *          bg_prob = root_prob_vector[0] * background[0] + ...
+         *
+         */
+
+        //must get bg_prob before fg_prob to initialize the substitution matrix correctly
+
+        long double bg_prob = phylogeny_tree->get_background_probability(background_equilibrium, position);
+        long double fg_prob = phylogeny_tree->get_foreground_probability(foreground_equilibrium);
+        probability *=  fg_prob / bg_prob;
+
+        delete background_equilibrium;
+        delete foreground_equilibrium;
+    }
+
+    if (motif_model.type == MODEL_TYPE_FORWARD || motif_model.type == MODEL_TYPE_REVERSE) probability /= 2.0;
 
     return probability;
 }
@@ -341,7 +407,7 @@ void Sequence::calculate_background_site_probabilities(vector<MotifModel> &motif
     }
 }
 
-void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, int max_sites) {
+void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, int max_sites, PhylogenyTree *phylogeny_tree) {
     long double motif_contribution;
     MotifModel *current_motif;
 
@@ -356,14 +422,22 @@ void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, in
 
         for (unsigned int j = 0; j < nucleotides.size(); j++) {
             if (possible_end_position(*current_motif, j)) {
-                site_probability_ratio.at(i).at(j) = foreground_probability(*current_motif, j) / background_site_probability.at(i).at(j);
+                if (phylogeny_tree == NULL) {
+                    site_probability_ratio.at(i).at(j) = foreground_probability(*current_motif, j) / background_site_probability.at(i).at(j);
+                } else {
+                    site_probability_ratio.at(i).at(j) = foreground_probability_phylogeny(*current_motif, j, phylogeny_tree);
+                }
 
                 if (site_probability_ratio.at(i).at(j) < 0) {
                     cerr << endl;
                     cerr << "ERROR: calculated site probability ratio < 0: file [" << __FILE__ << "] line [" << __LINE__ << "]" << endl;
                     cout << "motif_model: " << i << endl;
                     cerr << "sequence->site_probability_ratio[" << i << "][" << j << "]: " << site_probability_ratio.at(i).at(j) << endl;
-                    cerr << "foreground_prob: " << foreground_probability(*current_motif, j) << ", background_prob: " << background_site_probability.at(i).at(j) << endl;
+                    if (phylogeny_tree == NULL) {
+                        cerr << "foreground_prob: " << foreground_probability(*current_motif, j) << ", background_prob: " << background_site_probability.at(i).at(j) << endl;
+                    } else {
+                        cerr << "probability_phylogeny: " << foreground_probability_phylogeny(*current_motif, j, phylogeny_tree) << endl;
+                    }
                     current_motif->print(cerr);
                     exit(0);
                 }
@@ -429,4 +503,9 @@ void Sequence::zero_accumulated_samples() {
             accumulated_samples.at(j).at(k) = 0;
         }
     }
+}
+
+void Sequence::print_sequence(ostream &out) {
+    out << name << endl;
+    out << nucleotides << endl;
 }

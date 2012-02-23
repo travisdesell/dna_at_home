@@ -1,11 +1,11 @@
+#ifndef STRUCTS_H
+#define STRUCTS_H
+
 #include <iostream>
 #include <string>
 #include <vector>
 
 using namespace std;
-
-#ifndef STRUCTS_H
-#define STRUCTS_H
 
 #define ALPHABET_LENGTH 4
 #define ALPHABET "ACGT"
@@ -23,17 +23,5 @@ using namespace std;
 #ifndef _DEBUG_
 #define at(x) operator[](x)
 #endif
-
-
-/**
- *  This is a prime example of why C sucks.  Can't have the structs spread out across multiple header files.
- */
-class PhylogenyTreeNode {
-    char *name;
-    double evolution_time;
-    vector<long double> nucleotide_probability;
-    vector< vector<long double> > matrix;
-};
-
 
 #endif

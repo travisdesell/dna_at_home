@@ -3,8 +3,10 @@
 
 #include "sequences.hpp"
 
-void print_sample_and_nearest(Sequence &sequence, MotifModel &motif_model, int end_position, int nearest);
+using namespace std;
 
-void print_sample(Sequence &sequence, MotifModel &motif_model, int end_position);
+void print_sample_and_nearest(Sequence *sequence, MotifModel &motif_model, int end_position, int nearest);
+
+void print_sample(Sequence *sequence, MotifModel &motif_model, int end_position);
 
 #endif

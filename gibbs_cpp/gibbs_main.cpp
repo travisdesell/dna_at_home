@@ -1,8 +1,12 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 
+#ifndef _BOINC_
 #include <execinfo.h>
 #include <signal.h>
+#endif
+
 #include <stdlib.h>
 
 
@@ -31,7 +35,9 @@
 #include "sampling.hpp"
 #include "shifting.hpp"
 #include "checkpoint.hpp"
+#include "util.hpp"
 
+#include "phylogeny.hpp"
 
 #define SITES_CHECKPOINT_FILE "gibbs_sites_checkpoint.txt"
 #define SAMPLES_CHECKPOINT_FILE "gibbs_samples_checkpoint.txt"
@@ -39,11 +45,7 @@
 
 using namespace std;
 
-double background_nucleotide_probability[ALPHABET_LENGTH];
-
-double foreground_pseudocounts = 0.28;
-double background_pseudocounts = 5.0;
-
+#ifndef _BOINC_
 void handler(int sig) {
     void *array[30];
     size_t size;
@@ -56,12 +58,14 @@ void handler(int sig) {
     backtrace_symbols_fd(array, size, 2);
     exit(1);
 }
-
+#endif
 
 int main(int argc, char** argv) {
+#ifndef _BOINC_
     signal(SIGSEGV, handler);   // install our handler
     signal(SIGTERM, handler);
     signal(SIGABRT, handler);
+#endif
 
     int retval;
     double count_percentage;
@@ -94,9 +98,11 @@ int main(int argc, char** argv) {
     int sample_period = 0;
     int burn_in_period = 0;
     int sites_from_arguments = 0;
+    double tt_factor = 0.0;
 
     vector<string> arguments(argv, argv + argc);
 
+    string phylogeny_file;
     string sequence_file;
     string sites_file;
     vector<string> motif_info;
@@ -107,6 +113,11 @@ int main(int argc, char** argv) {
      */
     get_argument_vector<string>(arguments, "--motifs", true, motif_info);
     get_arguments(arguments, "--enable_shifting", false, max_shift_distance, shift_period);
+
+    get_argument(arguments, "--phylogeny_file", false, phylogeny_file);
+    if (phylogeny_file.compare("") != 0) {
+        get_argument(arguments, "--tt_factor", true, tt_factor);
+    }
 
     get_argument(arguments, "--sequence_file", true, sequence_file);
     get_argument(arguments, "--current_sites", false, sites_file);
@@ -126,8 +137,7 @@ int main(int argc, char** argv) {
     bool use_checkpointing                  = !argument_exists(arguments, "--no_checkpointing");
 
     vector<double> blocks;
-    if (argument_exists(arguments, "--blocks")) {
-        get_argument_vector<double>(arguments, "--blocks", false, blocks);
+    if (get_argument_vector<double>(arguments, "--blocks", false, blocks)) {
 
         if ((int)blocks.size() != max_sites + 1) {
             cerr << "ERROR: number of blocks (--blocks <b1> <b2> ... <bn>) not equal to max_sites + 1 (--max_sites <n>)" << endl;
@@ -144,8 +154,18 @@ int main(int argc, char** argv) {
         cerr << endl;
     }
 
-    vector<Sequence> sequences;
+    vector<Sequence*> *sequences = new vector<Sequence*>();
     read_sequences(sequences, sequence_file, max_sites, motif_info.size() /*motif_info.size() is the number of motifs*/, max_shift_distance);
+
+    PhylogenyTree *phylogeny_tree = NULL;
+    /**
+     *  We're using phylogeny so we need to make a phylogenetic tree.
+     */
+    if (phylogeny_file.compare("") != 0) {
+        ifstream in(phylogeny_file.c_str());
+        phylogeny_tree = new PhylogenyTree(in, sequences);
+        phylogeny_tree->set_tt_factor(tt_factor);
+    }
 
     /**
      *  Calculate the background probabilities since we only need to do this once.
@@ -168,6 +188,7 @@ int main(int argc, char** argv) {
             starting_from_checkpoint = 1;
             if (iteration >= burn_in_period) {
                 read_accumulated_samples(string(SAMPLES_CHECKPOINT_FILE), sequences);
+                write_accumulated_samples_to_file(cerr, sequences);
             }
         }
     }
@@ -177,6 +198,17 @@ int main(int argc, char** argv) {
     ofstream sites_output_file("independent_walks.txt");
 //    FILE* sites_output_file = fopen("independent_walks.txt", "w+");
     //FILE* sites_output_file = stderr;
+
+    /**
+     *  Only need to calculate the background site probabilities once (at least currently) and number of nucleotides once as they do not change.
+     */
+    long total_number_nucleotides = 0;
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        sequences->at(i)->calculate_background_site_probabilities(motif_models);
+
+        total_number_nucleotides += sequences->at(i)->nucleotides.size();
+    }
+    cerr << sequences->size() << " sequences with " << total_number_nucleotides << " total base pairs." << endl;
 
     for (independent_walk = 0; independent_walk < total_independent_walks; independent_walk++) {
 	    fprintf(stdout, "doing walk: %d\n", independent_walk);
@@ -199,30 +231,35 @@ int main(int argc, char** argv) {
                 /**
                  * select initial random samples
                  */
-                for (unsigned int i = 0; i < sequences.size(); i++) {
-                    sequences.at(i).sample_uniform_random(motif_models);
+                for (unsigned int i = 0; i < sequences->size(); i++) {
+                    sequences->at(i)->sample_uniform_random(motif_models);
                 }
             } else {
                 cerr << "sites were from arguments" << endl;
             }
+        } else {
+            /**
+             *  Since we did not start from a checkpoint, we need to zero out the accumulated samples.
+             */
+            for (unsigned int i = 0; i < sequences->size(); i++) {
+                sequences->at(i)->zero_accumulated_samples();
+            }
         }
-
-        long total_number_nucleotides = 0;
-        for (unsigned int i = 0; i < sequences.size(); i++) {
-            sequences.at(i).zero_accumulated_samples();
-            sequences.at(i).calculate_background_site_probabilities(motif_models);
-
-            total_number_nucleotides += sequences.at(i).nucleotides.size();
-        }
-        cerr << sequences.size() << " sequences with " << total_number_nucleotides << " total base pairs." << endl;
 
         /**
          * calculate the counts for all the samples -- we don't need to do this at 
          * every step, we can subtract the left out sequence from the counts then 
          * add the newly sampled counts
+         *
+         * if we started from a checkpoint or are doing another random walk , we should 
+         * zero out all the motif model counts before incrementing them all again.
          */
-        for (unsigned int i = 0; i < sequences.size(); i++) {
-            increment_counts(motif_models, sequences.at(i));
+        for (unsigned int i = 0; i < motif_models.size(); i++) {
+            motif_models.at(i).zero_counts();
+        }
+
+        for (unsigned int i = 0; i < sequences->size(); i++) {
+            increment_counts(motif_models, sequences->at(i));
         }
 //        fprintf(stderr, "incremented counts for [%d] sequences.\n", number_sequences);
 
@@ -243,17 +280,17 @@ int main(int argc, char** argv) {
         }
 
         for (int i = iteration; i < burn_in_period + sample_period; i++) {
-            if (i > 0 && shift_period > 0 && (i % shift_period) == 0) attempt_shifting(max_shift_distance, sequences, motif_models);
+            if (i > 0 && shift_period > 0 && (i % shift_period) == 0) attempt_shifting(max_shift_distance, sequences, motif_models, phylogeny_tree);
 
-            for (unsigned int j = 0; j < sequences.size(); j++) {
-                Sequence *sequence = &(sequences.at(j));
+            for (unsigned int j = 0; j < sequences->size(); j++) {
+                Sequence *sequence = sequences->at(j);
                 vector<Sample> *current_samples = &(sequence->sampled_sites);
 
                 /**
                  * leave one sequence out and re-calculate the motif models
                  * we can do this by decrementing the counts of the left-out sequence, and recalculating the models
                  */
-                decrement_counts(motif_models, *sequence);
+                decrement_counts(motif_models, sequence);
 
                 /**
                  * update the models
@@ -263,19 +300,27 @@ int main(int argc, char** argv) {
                 /**
                  * resample within the sequence left out
                  */
-                sequence->calculate_site_probabilities(motif_models, max_sites);
+//                cout << "calculating site probabilities" << endl;
+                sequence->calculate_site_probabilities(motif_models, max_sites, phylogeny_tree);
+//                cout << "calculated site probabilities" << endl;
 
                 sequence->resample_from_models(motif_models);
+
+ //               cout << "resampled from modles" << endl;
                 
                 /**
                  * update the counts with the new sample
                  */
-                increment_counts(motif_models, *sequence);
+                increment_counts(motif_models, sequence);
+
+//                cout << "incremented counts!" << endl;
 
                 /**
                  * update the models
                  */
                 update_motif_models(motif_models); //probably do not need to do this
+
+ //               cout << "updated models!" << endl;
 
                 if (i >= burn_in_period) {
                     //add the samples taken this iteration to the saved samples
@@ -287,15 +332,23 @@ int main(int argc, char** argv) {
                 }
 
                 progress = ((double)i)/((double)(burn_in_period + sample_period));
-                progress += (((double)j)/((double)sequences.size()) * (1.0/((double)(burn_in_period + sample_period))));
+                progress += (((double)j)/((double)sequences->size()) * (1.0/((double)(burn_in_period + sample_period))));
 
+//                cout << " STUFF!" << endl;
 #ifdef _BOINC_
+//                cout << "BOINC!" << endl;
                 boinc_fraction_done(progress);
 #else
-                cout << "\r" << progress;
+//                cout << "NOT BOINC!" << endl;
+//                cout << "\r" << progress;
+//                cout << progress << endl;
+//                if (i % 100 == 0) {
+                    printf("\r%8.5lf", progress);
+//                }
 #endif
             }
 
+//            if (i % 5 == 0 && i != 0) {
             if (i % 5000 == 0 && i != 0) {
                 write_sites(string(SITES_CHECKPOINT_FILE), sequences, seed, i + 1, independent_walk);
                 
@@ -323,15 +376,17 @@ int main(int argc, char** argv) {
 
         if (print_best_sites > 0) {
             for (unsigned int j = 0; j < motif_models.size(); j++) {
-                for (unsigned int i = 0; i < sequences.size(); i++) {
+                motif_models.at(j).print_short(cout);
+                cout << endl;
+                for (unsigned int i = 0; i < sequences->size(); i++) {
 
-                    for (unsigned int k = 0; k < sequences.at(i).nucleotides.size(); k++) {
-                        count_percentage = ((double)sequences.at(i).accumulated_samples.at(j).at(k)) / ((double)sample_period);
+                    for (unsigned int k = 0; k < sequences->at(i)->nucleotides.size(); k++) {
+                        count_percentage = ((double)sequences->at(i)->accumulated_samples.at(j).at(k)) / ((double)sample_period);
 
                         if (count_percentage > print_best_sites) {
                             printf("%5d,%2d%8d ", i, j, (k + 1) - motif_models.at(j).motif_width);
-                            print_sample_and_nearest(sequences.at(i), motif_models.at(j), k, 5);
-                            printf(" %7d %2.2lf %s\n", k, count_percentage, sequences.at(i).name.c_str());
+                            print_sample_and_nearest(sequences->at(i), motif_models.at(j), k, 5);
+                            printf(" %7d %2.4lf %s\n", k, count_percentage, sequences->at(i)->name.c_str());
                         }
                     }
                 }
@@ -362,6 +417,14 @@ int main(int argc, char** argv) {
         if (total_independent_walks > 1) sites_output_file << "</independent_walk>" << endl << endl;
     }
     sites_output_file.close();
+
+
+    for (unsigned int i = 0; i < sequences->size(); i++) delete sequences->at(i);
+    delete sequences;
+
+    if (phylogeny_tree != NULL) {
+        delete phylogeny_tree;
+    }
 
     #ifdef _BOINC_
         boinc_finish(0);

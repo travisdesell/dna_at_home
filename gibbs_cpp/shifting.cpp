@@ -10,6 +10,8 @@
 
 #include "../../mersenne_twister/dSFMT.h"
 
+using namespace std;
+
 vector<MotifModel> shifted_motif_models;
 
 void initialize_shifting(vector<MotifModel> &motif_models) {
@@ -21,7 +23,7 @@ void initialize_shifting(vector<MotifModel> &motif_models) {
     }
 }
 
-void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences, vector<MotifModel> &motif_models) {
+void attempt_model_shift(int motif_model, int shift, vector<Sequence*> *sequences, vector<MotifModel> &motif_models, PhylogenyTree *phylogeny_tree) {
     Sample *sample, *shifted_sample, *adjacent_sample;
     long double shifted_probability, unshifted_probability;
     int temp_model_type;
@@ -30,12 +32,17 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
 
     shifted_motif_model->zero_counts();
 
+    /**
+     *  Need to shift in the opposite direction if the model is REVERSE
+     */
+    if (shifted_motif_model->type == MODEL_TYPE_REVERSE) shift = -shift;
+
 //    printf("\n\nshift: %d\n", shift);
 
     bool made_shift = false;
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        Sequence *sequence = &(sequences[i]);
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence *sequence = sequences->at(i);
 
         for (unsigned int j = 0; j < sequence->sampled_sites.size(); j++) {
             sample = &(sequence->sampled_sites.at(j));
@@ -88,8 +95,8 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
         return;
     }
     //NEED TO UPDATE THE MOTIF MODEL
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        shifted_motif_model->increment_model_counts(sequences.at(i), sequences.at(i).shifted_sites, motif_model);
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        shifted_motif_model->increment_model_counts(sequences->at(i), sequences->at(i)->shifted_sites, motif_model);
     }
     
     temp_model_type = shifted_motif_model->type;
@@ -107,8 +114,8 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
     shifted_probability = 0.0;
     unshifted_probability = 0.0;
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        Sequence *sequence = &(sequences.at(i));
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence *sequence = sequences->at(i);
 
         for (unsigned int j = 0; j < sequence->sampled_sites.size(); j++) {
             sample = &(sequence->sampled_sites[j]);
@@ -119,8 +126,13 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
 //                printf("sample->end_position: %d, shifted_sample->end_position: %d\n", sample->end_position, shifted_sample->end_position);
 //                printf("\nSHIFTED foreground_probability: %.20Lf, background_probability: %.20Lf\n", foreground_probability(sequence, shifted_motif_models[motif_model], shifted_sample->end_position), sequence->background_site_probability[motif_model][shifted_sample->end_position]);
 
-                shifted_probability += log( sequence->foreground_probability(*shifted_motif_model, shifted_sample->end_position) / sequence->background_site_probability.at(motif_model).at(shifted_sample->end_position));
-                unshifted_probability += log( sequence->foreground_probability(motif_models.at(motif_model), sample->end_position) / sequence->background_site_probability.at(motif_model).at(sample->end_position));
+                if (phylogeny_tree == NULL) {
+                    shifted_probability += log( sequence->foreground_probability(*shifted_motif_model, shifted_sample->end_position) / sequence->background_site_probability.at(motif_model).at(shifted_sample->end_position));
+                    unshifted_probability += log( sequence->foreground_probability(motif_models.at(motif_model), sample->end_position) / sequence->background_site_probability.at(motif_model).at(sample->end_position));
+                } else {
+                    shifted_probability += log( sequence->foreground_probability_phylogeny(*shifted_motif_model, shifted_sample->end_position, phylogeny_tree) );
+                    unshifted_probability += log( sequence->foreground_probability_phylogeny(motif_models.at(motif_model), sample->end_position, phylogeny_tree) );
+                }
 //                unshifted_probability += log ( sequence->site_probability_ratio[motif_model][sample->end_position] );
 //                printf("incremented ratio to: %.20Lf\n", ratio);
 
@@ -150,8 +162,8 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
 
 //    cout << "\nPERFORMING SHIFT of " << shift << "!\n" << endl;
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        Sequence *sequence = &(sequences.at(i));
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence *sequence = sequences->at(i);
 
         for (unsigned int j = 0; j < sequence->sampled_sites.size(); j++) {
             if (sequence->shifted_sites.at(j).motif_model == motif_model) {
@@ -178,7 +190,7 @@ void attempt_model_shift(int motif_model, int shift, vector<Sequence> &sequences
      */
 }
 
-void attempt_shifting(int max_shift_distance, vector<Sequence> &sequences, vector<MotifModel> &motif_models) {
+void attempt_shifting(int max_shift_distance, vector<Sequence*> *sequences, vector<MotifModel> &motif_models, PhylogenyTree *phylogeny_tree) {
     int shift = (int)(dsfmt_gv_genrand_open_close() * (double)max_shift_distance * 2.0);
 
     /**
@@ -194,7 +206,7 @@ void attempt_shifting(int max_shift_distance, vector<Sequence> &sequences, vecto
 //    printf("shifting: %d\n", shift);
 
     for (unsigned int i = 0; i < motif_models.size(); i++) {
-        attempt_model_shift(i, shift, sequences, motif_models);
+        attempt_model_shift(i, shift, sequences, motif_models, phylogeny_tree);
     }
 
     /**

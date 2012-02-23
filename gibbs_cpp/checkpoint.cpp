@@ -19,13 +19,15 @@
 #include "checkpoint.hpp"
 #include "sequences.hpp"
 
-void write_sites(string filename, const vector<Sequence> &sequences, int seed, int iteration, int independent_walk) {
+using namespace std;
+
+void write_sites(string filename, vector<Sequence*> *sequences, int seed, int iteration, int independent_walk) {
 #ifdef _BOINC_
     string output_path;
-    int retval = boinc_resolve_filename_s(filename, output_path);
+    int retval = boinc_resolve_filename_s(filename.c_str(), output_path);
     
     if (retval) {
-        fprintf(stderr, "APP: error writing checkpoint (resolving checkpoint file name)\n");
+        fprintf(stderr, "APP: error writing sites checkpoint (resolving checkpoint file name)\n");
         return;
     }
 
@@ -46,12 +48,12 @@ void write_sites(string filename, const vector<Sequence> &sequences, int seed, i
     checkpoint_file.close();
 }
 
-void write_sites_to_file(ostream &out, const char *delimiter, const vector<Sequence> &sequences) {
+void write_sites_to_file(ostream &out, const char *delimiter, vector<Sequence*> *sequences) {
     bool already_printed = false;
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        for (unsigned int k = 0; k < sequences.at(i).sampled_sites.size(); k++) {
-            const Sample *sample = &(sequences.at(i).sampled_sites.at(k));
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        for (unsigned int k = 0; k < sequences->at(i)->sampled_sites.size(); k++) {
+            const Sample *sample = &(sequences->at(i)->sampled_sites.at(k));
             if (sample->end_position >= 0) {
                 if (already_printed) out << ":";
                 out << sample->motif_model << "," << sample->end_position;
@@ -64,17 +66,18 @@ void write_sites_to_file(ostream &out, const char *delimiter, const vector<Seque
 }
 
 
-void read_sites(string sites_filename, vector<Sequence> &sequences) {
+void read_sites(string sites_filename, vector<Sequence*> *sequences) {
 #ifdef _BOINC_
     string input_path;
     int retval;
 
-    retval = boinc_resolve_filename_s(filename, input_path);
+    retval = boinc_resolve_filename_s(sites_filename.c_str(), input_path);
     if (retval) {
-        return 0;
+        fprintf(stderr, "APP: error reading sites checkpoint (resolving checkpoint file name)\n");
+        return;
     }
 
-    ifstream sites_file(input_path);
+    ifstream sites_file(input_path.c_str());
 #else 
     ifstream sites_file(sites_filename.c_str());
 #endif
@@ -82,17 +85,17 @@ void read_sites(string sites_filename, vector<Sequence> &sequences) {
     read_sites_from_file(sites_file, sequences);
 }
 
-int read_sites_from_checkpoint(string sites_filename, vector<Sequence> &sequences, int &seed, int &iteration, int &independent_walk) {
+int read_sites_from_checkpoint(string sites_filename, vector<Sequence*> *sequences, int &seed, int &iteration, int &independent_walk) {
 #ifdef _BOINC_
-    char input_path[512];
+    string input_path;
     int retval;
 
-    retval = boinc_resolve_filename(filename, input_path, sizeof(input_path));
+    retval = boinc_resolve_filename_s(sites_filename.c_str(), input_path);
     if (retval) {
         return 0;
     }
 
-    ifstream sites_file(input_path); /** TODO: NEED TO DOUBLE CHECK IF THIS IS POSSIBLE. **/
+    ifstream sites_file(input_path.c_str()); 
 #else 
     ifstream sites_file(sites_filename.c_str());
 #endif
@@ -126,20 +129,22 @@ int read_sites_from_checkpoint(string sites_filename, vector<Sequence> &sequence
     return 1;
 }
 
-void read_sites_from_file(ifstream &sites_file, vector<Sequence> &sequences) {
+void read_sites_from_file(ifstream &sites_file, vector<Sequence*> *sequences) {
     if (sites_file.is_open()) {
         string current_line;
         int current_sequence = 0;
 
         getline(sites_file, current_line);
+
         while (sites_file.good() && !sites_file.eof()) {
 //            cout << "current sequence: " << current_sequence << ", current line: " << current_line << endl;
-            if (current_sequence >= (int)sequences.size()) {
+            if (current_sequence >= (int)sequences->size()) {
                 cerr << "ERROR: sites_file contains sites for more sequences than in sequences file." << endl;
                 exit(0);
             }
 
-            sequences.at(current_sequence).sampled_sites.clear();
+            int initial_size = sequences->at(current_sequence)->sampled_sites.size();
+            sequences->at(current_sequence)->sampled_sites.clear();
 
             int motif_number, end_position;
             stringstream ss(current_line);
@@ -147,10 +152,15 @@ void read_sites_from_file(ifstream &sites_file, vector<Sequence> &sequences) {
             while ( ss >> motif_number >> c  >> end_position ) {
                 ss >> c;
 
-                sequences.at(current_sequence).sampled_sites.push_back(Sample(motif_number, end_position));
+                sequences->at(current_sequence)->sampled_sites.push_back(Sample(motif_number, end_position));
 
                 if (c == '.') break;
             }
+
+            while ((int)sequences->at(current_sequence)->sampled_sites.size() < initial_size) {
+                sequences->at(current_sequence)->sampled_sites.push_back(Sample(-1, -1));
+            }
+
             current_sequence++;
             getline(sites_file, current_line);
         }
@@ -158,9 +168,9 @@ void read_sites_from_file(ifstream &sites_file, vector<Sequence> &sequences) {
     }
 }
 
-void write_accumulated_samples_to_file(ostream &out, const vector<Sequence> &sequences) {
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        const Sequence *sequence = &(sequences.at(i));
+void write_accumulated_samples_to_file(ostream &out, vector<Sequence*> *sequences) {
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence *sequence = sequences->at(i);
         for (unsigned int j = 0; j < sequence->accumulated_samples.size(); j++) {
             out << sequence->accumulated_samples.at(j).at(0);
             for (unsigned int k = 1; k < sequence->accumulated_samples.at(j).size(); k++) {
@@ -171,12 +181,12 @@ void write_accumulated_samples_to_file(ostream &out, const vector<Sequence> &seq
     }
 }
 
-void write_accumulated_samples(string filename, const vector<Sequence> &sequences) {
+void write_accumulated_samples(string filename, vector<Sequence*> *sequences) {
 #ifdef _BOINC_
     string output_path;
 
-    retval = boinc_resolve_filename_s(filename, output_path);
-    if (!checkpoint_file) {
+    int retval = boinc_resolve_filename_s(filename.c_str(), output_path);
+    if (retval) {
         fprintf(stderr, "APP: error writing checkpoint (opening checkpoint file)\n");
         return;
     }
@@ -190,12 +200,12 @@ void write_accumulated_samples(string filename, const vector<Sequence> &sequence
     out.close();
 }
 
-int read_accumulated_samples(string filename, vector<Sequence> &sequences) {
+int read_accumulated_samples(string filename, vector<Sequence*> *sequences) {
 #ifdef _BOINC_    
     string input_path;
     int retval;
 
-    retval = boinc_resolve_filename_s(filename, input_path);
+    retval = boinc_resolve_filename_s(filename.c_str(), input_path);
     if (retval) {
         return 0;
     }
@@ -214,8 +224,8 @@ int read_accumulated_samples(string filename, vector<Sequence> &sequences) {
 
     string line;
 
-    for (unsigned int i = 0; i < sequences.size(); i++) {
-        Sequence *sequence = &(sequences.at(i));
+    for (unsigned int i = 0; i < sequences->size(); i++) {
+        Sequence *sequence = sequences->at(i);
 
         for (unsigned int j = 0; j < sequence->accumulated_samples.size(); j++) {
             if ( !getline(instream, line) ) {
@@ -224,38 +234,36 @@ int read_accumulated_samples(string filename, vector<Sequence> &sequences) {
                 exit(0);
             }
 
-            char *line_c = (char*)malloc(line.size() + 1);
-            copy(line.begin(), line.end(), line_c);
-            line_c[line.size()] = '\0';
+//            cout << "line: '" << line << "'" << endl << endl;
 
-//            cout << "current line: " << line_c << endl;
-            char *token = strtok(line_c, ",\r\n");
-
-//            cout << "acc samples.at(j).size: " << sequence->accumulated_samples.at(j).size() << endl;
-//            cout << "sequence nucleotides size: " << sequence->nucleotides.size() << endl;
-
+            size_t prev_comma_pos = 0;
+            size_t current_comma_pos = line.find(',');
             for (unsigned int k = 0; k < sequence->accumulated_samples.at(j).size(); k++) {
-                if (token == NULL) {
-                    cerr << "ERROR: reading samples, token == NULL before all samples should have been read." << endl;
-                    cerr << "loop i: [" << i << "], j: [" << j << "], k: [" << k << "]" << endl;
+                if (current_comma_pos == string::npos) {
+                    cerr << "ERROR: reading samples, reached end of samples before all samples should have been read." << endl;
+                    cerr << "accumulated sample: [" << k << "], prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "]" << endl;
                     cerr << "error on line [" << __LINE__ << "], file [" << __FILE__ << "]" << endl;
                     exit(0);
                 }
-//                printf("token: [%s], k: [%d]\n", token, k);
 
-                sequence->accumulated_samples.at(j).at(k) = atoi(token);
+//                cerr << "prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "], str: '" << line.substr(prev_comma_pos, current_comma_pos - prev_comma_pos) << "'" << endl;
+                sequence->accumulated_samples.at(j).at(k) = atoi( line.substr(prev_comma_pos, (current_comma_pos - prev_comma_pos)).c_str() );
+                prev_comma_pos = current_comma_pos + 1;
 
-                token = strtok(NULL, ",\r\n");
+                if (k < sequence->accumulated_samples.at(j).size() - 2) {
+                    current_comma_pos = line.find(',', prev_comma_pos + 1);
+                } else {
+                    current_comma_pos = line.size();
+                }
             }
-            if (token != NULL) {
-                cerr << "ERROR: reading samples, token != NULL after all samples should have been read." << endl;
-                cerr << "token is: [" << token << "]" << endl;
-                cerr << "next token is: [" << strtok(NULL, ",\r\n") << "]" << endl;
-                cerr << "i: [" << i << "], j: [" << j << "]" << endl;
+
+            current_comma_pos = line.find(',', current_comma_pos - 1);
+            if (current_comma_pos != string::npos) {
+                cerr << "ERROR: reading samples, more samples available after all samples should have been read." << endl;
+                cerr << "prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "]" << endl;
                 cerr << "error on line [" << __LINE__ << "], file [" << __FILE__ << "]" << endl;
                 exit(0);
             }
-            delete [] line_c;
         }
     }
 

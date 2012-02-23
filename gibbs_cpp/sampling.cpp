@@ -9,11 +9,13 @@
 
 #include "../../mersenne_twister/dSFMT.h"
 
+using namespace std;
+
 void Sequence::sample_uniform_random_helper(int number_sites, int position, vector<MotifModel> &motif_models) {
     long double rand;
     long double total;
-    long double no_site_probability;
-    long double site_probability;
+    long double no_site_prob;
+    long double site_prob;
 
     if (number_sites < 0) return; //we've sampled all the site we're going to
     if (position - 1 <= 0) return;  //we've reached the beginning of the sequence
@@ -21,18 +23,18 @@ void Sequence::sample_uniform_random_helper(int number_sites, int position, vect
 //    printf("\nSAMPLE UNIFORM RANDOM HELPER, position: [%d], number_sites: [%d]\n", position, number_sites);
 
     total = possible_site_counts.at(number_sites).at(position);
-    no_site_probability = possible_site_counts.at(number_sites).at(position - 1);
+    no_site_prob = possible_site_counts.at(number_sites).at(position - 1);
 
     rand = dsfmt_gv_genrand_open_close() * total;
 
-//    printf("rand: [%Lf], no_site_probability: [%Lf], total: [%Lf], position: [%d]\n", rand, no_site_probability, total, position);
+//    printf("rand: [%Lf], no_site_prob: [%Lf], total: [%Lf], position: [%d]\n", rand, no_site_prob, total, position);
 
-    if (rand < no_site_probability) {
+    if (rand < no_site_prob) {
         sample_uniform_random_helper(number_sites, position - 1, motif_models);
         return;
 
     } else {
-        rand -= no_site_probability;
+        rand -= no_site_prob;
 
         for (unsigned int i = 0; i < motif_models.size(); i++) {
             MotifModel *motif_model = &(motif_models.at(i));
@@ -41,16 +43,16 @@ void Sequence::sample_uniform_random_helper(int number_sites, int position, vect
 //            printf("sampling for motif: [%d], number sites: [%d]\n", i, number_sites);
 
             if (number_sites == 0) {
-                site_probability = 1;
+                site_prob = 1;
             } else {
-                site_probability = possible_site_counts.at(number_sites - 1).at(position - motif_model->motif_width);
+                site_prob = possible_site_counts.at(number_sites - 1).at(position - motif_model->motif_width);
             }
 
-//            printf("rand: %Lf, total: %Lf, no_site_probability: %Lf, site_probability: %Lf, number sites: %d, position: %d\n", rand, total, no_site_probability, site_probability, number_sites, position);
+//            printf("rand: %Lf, total: %Lf, no_site_prob: %Lf, site_prob: %Lf, number sites: %d, position: %d\n", rand, total, no_site_prob, site_prob, number_sites, position);
 
-//            printf("rand: [%Lf], site_probability[%d]: [%Lf], total: [%Lf]\n", rand, i, site_probability, total);
+//            printf("rand: [%Lf], site_prob[%d]: [%Lf], total: [%Lf]\n", rand, i, site_prob, total);
 
-            if (rand < site_probability) {
+            if (rand < site_prob) {
 //                printf("TAKING A SAMPLE\n");
                 //take a sample
                 Sample *sample = &(sampled_sites.at(number_sites));
@@ -62,7 +64,7 @@ void Sequence::sample_uniform_random_helper(int number_sites, int position, vect
                 sample_uniform_random_helper(number_sites - 1, position - motif_model->motif_width, motif_models);
                 return;
             } else {
-                rand -= site_probability;
+                rand -= site_prob;
             }
 
         }
@@ -134,7 +136,7 @@ void Sequence::resample_from_models_helper(int number_sites, int position, vecto
         rand -= no_site_probability;
 
         for (i = 0; i < motif_models.size(); i++) {
-            MotifModel *motif_model = &(motif_models[i]);
+            MotifModel *motif_model = &(motif_models.at(i));
 //            printf("motif width: %d\n", motif_model->width);
 
             current_site_probability = motif_probability_contribution.at(number_sites).at(position).at(i);
@@ -247,34 +249,34 @@ void Sequence::resample_from_models(vector<MotifModel> &motif_models) {
     resample_from_models_helper(number_sites - 1, nucleotides.size() - 1, motif_models);
 }
 
-void print_sample(Sequence *sequence, MotifModel *motif_model, int end_position) {
+void print_sample(Sequence *sequence, MotifModel &motif_model, int end_position) {
     int i;
     printf("[");
-    for (i = 0; i < motif_model->motif_width; i++) {
-        printf("%c", sequence->nucleotides[end_position - motif_model->motif_width + 1 + i]);
+    for (i = 0; i < motif_model.motif_width; i++) {
+        printf("%c", sequence->nucleotides.at(end_position - motif_model.motif_width + 1 + i));
     }
     printf("]");
 }
 
-void print_sample_and_nearest(Sequence &sequence, MotifModel &motif_model, int end_position, int nearest) {
+void print_sample_and_nearest(Sequence *sequence, MotifModel &motif_model, int end_position, int nearest) {
     int i, position;
 
     for (i = 0; i < nearest; i++) {
         position = end_position - motif_model.motif_width + 1 - nearest + i;
         if (position < 0) printf(" ");
-        else printf("%c", tolower(sequence.nucleotides[position]));
+        else printf("%c", tolower(sequence->nucleotides[position]));
     }
     printf(" ");
 
     for (i = 0; i < motif_model.motif_width; i++) {
-        printf("%c", sequence.nucleotides[end_position - motif_model.motif_width + 1 + i]);
+        printf("%c", sequence->nucleotides[end_position - motif_model.motif_width + 1 + i]);
     }
 
     printf(" ");
     for (i = 0; i < nearest; i++) {
         position = end_position + 1 + i;
-        if (position >= (int)sequence.nucleotides.size()) printf(" ");
-        else printf("%c", tolower(sequence.nucleotides[position]));
+        if (position >= (int)sequence->nucleotides.size()) printf(" ");
+        else printf("%c", tolower(sequence->nucleotides[position]));
     }
 }
 

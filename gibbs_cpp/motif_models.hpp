@@ -11,6 +11,10 @@ typedef class MotifModel;
 #define MODEL_TYPE_FORWARD 2
 #define MODEL_TYPE_PALINDROMIC 3
 
+const string MODEL_TYPES[4] = { "NORMAL", "REVERSE", "FORWARD", "PALINDROMIC" };
+
+using namespace std;
+
 class MotifModel {
     public: 
         int type;
@@ -29,19 +33,21 @@ class MotifModel {
 
         MotifModel(int _type, int _motif_width);
         MotifModel(string motif_info);
+        MotifModel(int _type, vector< vector<double> > &_nucleotide_probabilities);
 
-        ~MotifModel() {
+        ~MotifModel() {}
 
-        }
-
-        void increment_counts_for_sample(const Sequence &sequence, const Sample &sample);
-        void increment_model_counts(const Sequence &sequence, const vector<Sample> &samples, int motif_model_number);
+        void increment_counts_for_sample(Sequence *sequence, const Sample &sample);
+        void increment_model_counts(Sequence *sequence, const vector<Sample> &samples, int motif_model_number);
 
         void zero_counts();
 
         void print(ostream &out_stream);
+        void print_short(ostream &out_stream);
 
         void update_motif_model();
+
+        string generate_possible_nucleotides();
 };                                                                                            
 
 void update_motif_models(vector<MotifModel> &motif_models);
@@ -51,7 +57,9 @@ void initialize_motif_models(vector<MotifModel> &motif_models, vector<string> &m
 
 void copy_motif_model(const MotifModel &source, MotifModel &destination);
 
-void increment_counts(vector<MotifModel> &motif_models, const Sequence &sequence);
-void decrement_counts(vector<MotifModel> &motif_models, const Sequence &sequence);
+void increment_counts(vector<MotifModel> &motif_models, Sequence *sequence);
+void decrement_counts(vector<MotifModel> &motif_models, Sequence *sequence);
+
+void read_motifs_from_file(string filename, vector<MotifModel> &motif_models);
 
 #endif

@@ -9,21 +9,18 @@ typedef class Sequence;
 
 #include "structs.hpp"
 #include "motif_models.hpp"
+#include "phylogeny.hpp"
+
+using namespace std;
 
 class Sample {
     public:
-        int end_position;
         int motif_model;
+        int end_position;
 
-        Sample() {
-            end_position = -1;
-            motif_model = -1;
-        }
+        Sample() : motif_model(-1), end_position(-1) { }
 
-        Sample(int _motif_model, int _end_position) {
-            motif_model = _motif_model;
-            end_position = _end_position;
-        }
+        Sample(int _motif_model, int _end_position) : motif_model(_motif_model), end_position(_end_position) {}
 };
 
 class Sequence {
@@ -55,10 +52,11 @@ class Sequence {
 
         long double background_probability(double *background_nucleotide_probability, MotifModel &motif_model, int end_position);
         long double foreground_probability(MotifModel &motif_model, int end_position);
+        long double foreground_probability_phylogeny(MotifModel &motif_model, int end_position, PhylogenyTree *phylogeny_tree);
 
         void calculate_distance_to_invalid();
         void calculate_background_site_probabilities(vector<MotifModel> &motif_models);
-        void calculate_site_probabilities(vector<MotifModel> &motif_models, int max_sites);
+        void calculate_site_probabilities(vector<MotifModel> &motif_models, int max_sites, PhylogenyTree *phylogeny_tree);
 
         void zero_accumulated_samples();
 
@@ -66,13 +64,15 @@ class Sequence {
         void sample_uniform_random_helper(int number_sites, int position, vector<MotifModel> &motif_models);
         void resample_from_models_helper(int numer_sites, int position, vector<MotifModel> &motif_models);
         void resample_from_models(vector<MotifModel> &motif_models);
+
+        void print_sequence(ostream &out);
 };
 
-void read_sequences(vector<Sequence> &sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance);
-void calculate_background_nucleotide_probabilities(vector<Sequence> &sequences);
-void calculate_background_site_probabilities(vector<Sequence> &sequence);
+void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance);
+void calculate_background_nucleotide_probabilities(vector<Sequence*> *sequences);
+void calculate_background_site_probabilities(vector<Sequence*> *sequence);
 
-void calculate_site_counts(vector<Sequence> &sequences, vector<MotifModel> &motif_models, vector<double> &blocks, int max_sites);
+void calculate_site_counts(vector<Sequence*> *sequences, vector<MotifModel> &motif_models, vector<double> &blocks, int max_sites);
 
 void read_sequence_file(char *filename);
 
