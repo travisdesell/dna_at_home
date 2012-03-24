@@ -119,14 +119,16 @@ void Sequence::resample_from_models_helper(int number_sites, int position, vecto
     if (number_sites < 0) return; //we've sampled all the site we're going to
     if (position - 1 <= 0) return;  //we've reached the beginning of the sequence
 
-//    printf("\nSAMPLE FROM MODEL HELPER, position: [%d], number_sites: [%d]\n", position, number_sites);
+//    fprintf(stderr, "\nSAMPLE FROM MODEL HELPER, position: [%d], number_sites: [%d]\n", position, number_sites);
 
     long double total = site_probability.at(number_sites).at(position);
+//    fprintf(stderr, "got total [%Lf]\n", total);
     long double no_site_probability = site_probability.at(number_sites).at(position - 1);
+//    fprintf(stderr, "got no site probability [%Lf]\n", no_site_probability);
 
     rand = dsfmt_gv_genrand_open_close() * total;
 
-//    printf("rand: [%.30Lf], number_sites: [%d], no_site_probability: [%.30Lf], total: [%.30Lf]\n", rand, number_sites, no_site_probability, total);
+//    fprintf(stderr, "rand: [%.30Lf], number_sites: [%d], no_site_probability: [%.30Lf], total: [%.30Lf]\n", rand, number_sites, no_site_probability, total);
 
     if (rand < no_site_probability) {
         resample_from_models_helper(number_sites, position - 1, motif_models);
@@ -141,7 +143,7 @@ void Sequence::resample_from_models_helper(int number_sites, int position, vecto
 
             current_site_probability = motif_probability_contribution.at(number_sites).at(position).at(i);
 
-//            printf("rand: [%.15Lf], number_sites: [%d], site_probability[%d]: [%.15Lf], total: [%.15Lf]\n", rand, number_sites, i, site_probability, total);
+//            fprintf(stderr, "rand: [%.15Lf], number_sites: [%d], current_site_probability[%d]: [%.15Lf], total: [%.15Lf]\n", rand, number_sites, i, current_site_probability, total);
 
             if (rand < current_site_probability) {
                 //take a sample

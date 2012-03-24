@@ -57,6 +57,8 @@ Sequence::Sequence(string sequence_information, string _nucleotides, int max_sit
     background_site_probability = vector< vector<long double> >(number_motifs, vector<long double>(nucleotides.size(), (long double)0.0));
     site_probability_ratio = vector< vector<long double> >(number_motifs, vector<long double>(nucleotides.size(), (long double)0.0));
 
+    cerr << "created sequence '" << sequence_information << " with max sites = '" << max_sites << "' and nucleotides.size() = '" << nucleotides.size() << "'" << endl;
+
     site_probability = vector< vector<long double> >(max_sites, vector<long double>(nucleotides.size(), (long double)0.0));
     motif_probability_contribution = vector< vector< vector<long double> > >(max_sites, vector< vector<long double> >(nucleotides.size(), vector<long double>(number_motifs, (long double)0.0)));
 
@@ -94,7 +96,24 @@ void remove_carriage_return(string &s) {
 }
 
 void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance) {
+    #ifdef _BOINC_
+    string input_path;
+    int retval;
+
+    retval = boinc_resolve_filename_s(sequence_filename.c_str(), input_path);
+    if (retval) {
+        fprintf(stderr, "APP: error reading sites checkpoint (resolving checkpoint file name)\n");
+        return;
+    }
+
+    ifstream sequence_file(input_path.c_str());
+    cerr << "reading from file input stream: " << input_path << endl;
+#else
     ifstream sequence_file(sequence_filename.c_str());
+    cerr << "reading from file input stream: " << sequence_filename << endl;
+#endif
+
+
     if (sequence_file.is_open()) {
         string current_line;
 

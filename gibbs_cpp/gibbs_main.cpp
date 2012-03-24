@@ -2,7 +2,7 @@
 #include <fstream>
 #include <vector>
 
-#ifndef _BOINC_
+#ifdef _DEBUG_
 #include <execinfo.h>
 #include <signal.h>
 #endif
@@ -21,6 +21,10 @@
     #include "filesys.h"
     #include "boinc_api.h"
     #include "mfile.h"
+#endif
+
+#ifdef _LINUX64_
+    #include <sys/resource.h>
 #endif
 
 #include "time.h"
@@ -45,7 +49,7 @@
 
 using namespace std;
 
-#ifndef _BOINC_
+#ifdef _DEBUG_
 void handler(int sig) {
     void *array[30];
     size_t size;
@@ -61,7 +65,7 @@ void handler(int sig) {
 #endif
 
 int main(int argc, char** argv) {
-#ifndef _BOINC_
+#ifdef _DEBUG_
     signal(SIGSEGV, handler);   // install our handler
     signal(SIGTERM, handler);
     signal(SIGABRT, handler);
@@ -85,6 +89,27 @@ int main(int argc, char** argv) {
 
         if (retval) exit(retval);
     #endif
+
+#ifdef _LINUX64_
+    const rlim_t kStackSize = 64L * 1024L * 1024L;   // min stack size = 64 Mb
+    struct rlimit rl;
+    int result;
+
+    result = getrlimit(RLIMIT_STACK, &rl);
+    if (result == 0) {
+	fprintf(stderr, "getrlimit returned result = %d, r1.rlim_cur: %ld, kStackSize: %ld\n", result, rl.rlim_cur, kStackSize);
+        if (rl.rlim_cur < kStackSize) {
+            fprintf(stderr,  "setting rl.rlim_cur to: %ld\n", kStackSize);
+
+            rl.rlim_cur = kStackSize;
+            result = setrlimit(RLIMIT_STACK, &rl);
+            if (result != 0) {
+                fprintf(stderr, "setrlimit returned result = %d\n", result);
+            }
+        }
+    }
+    fprintf(stderr, "updated rlimit\n");
+#endif
 
     int independent_walk = 0;
     int total_independent_walks = 1;
@@ -133,7 +158,7 @@ int main(int argc, char** argv) {
     bool print_current_sites                = argument_exists(arguments, "--print_current_sites");
     bool print_accumulated_samples          = argument_exists(arguments, "--print_accumulated_samples");
     bool print_motif_models                 = argument_exists(arguments, "--print_motif_models");
-    bool print_current_sites_logarithmic    = argument_exists(arguments, "--print_current_sites_logarithmic");
+//    bool print_current_sites_logarithmic    = argument_exists(arguments, "--print_current_sites_logarithmic");
     bool use_checkpointing                  = !argument_exists(arguments, "--no_checkpointing");
 
     vector<double> blocks;
@@ -165,6 +190,9 @@ int main(int argc, char** argv) {
         ifstream in(phylogeny_file.c_str());
         phylogeny_tree = new PhylogenyTree(in, sequences);
         phylogeny_tree->set_tt_factor(tt_factor);
+        cerr << "Sucessfully created the phylogeny tree." << endl;
+    } else {
+        cerr << "Not using phylogeny." << endl;
     }
 
     /**
@@ -195,7 +223,7 @@ int main(int argc, char** argv) {
 
     if (shift_period > 0) initialize_shifting(motif_models);
 
-    ofstream sites_output_file("independent_walks.txt");
+//    ofstream sites_output_file("independent_walks.txt");
 //    FILE* sites_output_file = fopen("independent_walks.txt", "w+");
     //FILE* sites_output_file = stderr;
 
@@ -211,21 +239,20 @@ int main(int argc, char** argv) {
     cerr << sequences->size() << " sequences with " << total_number_nucleotides << " total base pairs." << endl;
 
     for (independent_walk = 0; independent_walk < total_independent_walks; independent_walk++) {
-	    fprintf(stdout, "doing walk: %d\n", independent_walk);
+	    cerr << "doing walk: " << independent_walk << endl;
 
         if (seed < 0) {
             seed = time(NULL);
-            fprintf(stderr, "seeding: %d\n", seed);
             dsfmt_gv_init_gen_rand(seed);
+            cerr << "seeding: " << seed << endl;
         } else {
             dsfmt_gv_init_gen_rand(seed + iteration + independent_walk);
-            fprintf(stderr, "seeding: %d\n", seed + iteration + independent_walk);
+            cerr << "seeding: " << (seed + iteration + independent_walk) << endl;
         }
 
         calculate_site_counts(sequences, motif_models, blocks, max_sites);
 
         if (starting_from_checkpoint != 1) {
-            starting_from_checkpoint = 0;
             if (!sites_from_arguments) {
                 cerr << "sampling initial sites uniform random" << endl;
                 /**
@@ -237,13 +264,15 @@ int main(int argc, char** argv) {
             } else {
                 cerr << "sites were from arguments" << endl;
             }
-        } else {
             /**
              *  Since we did not start from a checkpoint, we need to zero out the accumulated samples.
              */
+            cerr << "Zeroing accumulated samples." << endl;
             for (unsigned int i = 0; i < sequences->size(); i++) {
                 sequences->at(i)->zero_accumulated_samples();
             }
+        } else {
+            starting_from_checkpoint = 0;
         }
 
         /**
@@ -254,22 +283,25 @@ int main(int argc, char** argv) {
          * if we started from a checkpoint or are doing another random walk , we should 
          * zero out all the motif model counts before incrementing them all again.
          */
+        cerr << "Zeroing counts for motif models." << endl;
         for (unsigned int i = 0; i < motif_models.size(); i++) {
             motif_models.at(i).zero_counts();
         }
 
+        cerr << "Incrementing intial counts for motifs." << endl;
         for (unsigned int i = 0; i < sequences->size(); i++) {
             increment_counts(motif_models, sequences->at(i));
         }
 //        fprintf(stderr, "incremented counts for [%d] sequences.\n", number_sequences);
 
-        printf("burn in period: %d, sample period: %d\n", burn_in_period, sample_period);
+        cerr << "burn in period: " << burn_in_period << ", sample period: " << sample_period << endl;
         /**
          * do the burn in walk
          */
 
         print_current_sites_frequency = print_current_sites_frequency_initial;
 
+        /*
         if (total_independent_walks > 1) sites_output_file << "<independent_walk>" << endl;
         if (print_current_sites_frequency > 0) {
             sites_output_file << "<current_sites>" << endl;
@@ -277,10 +309,18 @@ int main(int argc, char** argv) {
             write_sites_to_file(sites_output_file, ".\n", sequences);
             sites_output_file << "</current_sites>" << endl;
             sites_output_file.flush();
-        }
+       }
+       */
 
         for (int i = iteration; i < burn_in_period + sample_period; i++) {
-            if (i > 0 && shift_period > 0 && (i % shift_period) == 0) attempt_shifting(max_shift_distance, sequences, motif_models, phylogeny_tree);
+            if (i > 0 && shift_period > 0 && (i % shift_period) == 0) {
+//                cerr << "attempting shift." << endl;
+                attempt_shifting(max_shift_distance, sequences, motif_models, phylogeny_tree);
+//                cerr << "shifted." << endl;
+            }
+
+//            if ((i % 100) == 0) 
+//                cerr << "Made it to iteration: " << i << endl;
 
             for (unsigned int j = 0; j < sequences->size(); j++) {
                 Sequence *sequence = sequences->at(j);
@@ -304,9 +344,11 @@ int main(int argc, char** argv) {
                 sequence->calculate_site_probabilities(motif_models, max_sites, phylogeny_tree);
 //                cout << "calculated site probabilities" << endl;
 
+//                cerr << "resampling from models!" << endl;
                 sequence->resample_from_models(motif_models);
+//                cerr << "success resampled from models!" << endl;
 
- //               cout << "resampled from modles" << endl;
+ //               cout << "resampled from models" << endl;
                 
                 /**
                  * update the counts with the new sample
@@ -352,7 +394,9 @@ int main(int argc, char** argv) {
             if (i % 5000 == 0 && i != 0) {
                 write_sites(string(SITES_CHECKPOINT_FILE), sequences, seed, i + 1, independent_walk);
                 
-                if (i >= burn_in_period) write_accumulated_samples(string(SAMPLES_CHECKPOINT_FILE), sequences);
+                if (i >= burn_in_period) {
+                    write_accumulated_samples(string(SAMPLES_CHECKPOINT_FILE), sequences);
+                }
 
                 dsfmt_gv_init_gen_rand(seed + i + 1);
 #ifdef _BOINC_
@@ -360,6 +404,7 @@ int main(int argc, char** argv) {
 #endif
             }
 
+            /*
             if (print_current_sites_frequency > 0 && (((i+1) % print_current_sites_frequency) == 0)) {
                 sites_output_file << "<current_sites>" << endl;
                 sites_output_file << "<iteration>" << i + 1 << "</iteration>" << endl;
@@ -369,6 +414,7 @@ int main(int argc, char** argv) {
 
                 if (print_current_sites_logarithmic) print_current_sites_frequency *= 2;
             }
+            */
         }
 
         printf("\n");
@@ -414,9 +460,9 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (total_independent_walks > 1) sites_output_file << "</independent_walk>" << endl << endl;
+//        if (total_independent_walks > 1) sites_output_file << "</independent_walk>" << endl << endl;
     }
-    sites_output_file.close();
+//    sites_output_file.close();
 
 
     for (unsigned int i = 0; i < sequences->size(); i++) delete sequences->at(i);
