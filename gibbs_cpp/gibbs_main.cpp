@@ -7,7 +7,7 @@
 #include <signal.h>
 #endif
 
-#include <stdlib.h>
+#include <cstdlib>
 
 
 #ifdef _WIN32
