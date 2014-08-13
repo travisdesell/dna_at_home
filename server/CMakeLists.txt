@@ -21,7 +21,7 @@ include_directories (${PROJECT_SOURCE_DIR})
 #same directory as TAO. It should be compiled in the ../undvc_common/build
 #directory
 FIND_PATH(UNDVC_COMMON_INCLUDE_DIR file_io.hxx
-    ../undvc_common         #add addiitonal paths here if undvc_common is in a different directory
+    ~/undvc_common         #add addiitonal paths here if undvc_common is in a different directory
     )
 MESSAGE(STATUS "UNDVC_COMMON include directory: ${UNDVC_COMMON_INCLUDE_DIR}")
 
@@ -38,7 +38,8 @@ include_directories(${UNDVC_COMMON_INCLUDE_DIR})
 #UNDVC_COMMON has the FindBOINC.cmake and FindMYSQL.cmake files
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${UNDVC_COMMON_INCLUDE_DIR}/cmake/Modules/")
 
-
+find_package(Boost REQUIRED COMPONENTS filesystem system)
+message(STATUS ${Boost_LIBRARIES})
 
 find_package(MySQL REQUIRED)
 find_package(BOINC REQUIRED)
@@ -69,13 +70,14 @@ add_executable(dna_validator
         ${BOINC_INCLUDE_DIR}/sched/validate_util
         ${BOINC_INCLUDE_DIR}/sched/validate_util2
         dna_validation_policy)
-target_link_libraries(dna_validator undvc_common ${BOINC_LIBRARIES} ${MYSQL_LIBRARIES})
+target_link_libraries(dna_validator ${UNDVC_COMMON_LIBRARY} ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES})
 
-add_executable(dna_assimilator
-        ${BOINC_INCLUDE_DIR}/sched/assimilator
-        ${BOINC_INCLUDE_DIR}/sched/validate_util
-        dna_assimilation_policy)
-target_link_libraries(dna_assimilator undvc_common ${BOINC_LIBRARIES} ${MYSQL_LIBRARIES} ${Boost_LIBRARIES})
+#add_executable(dna_assimilator
+#   ${BOINC_INCLUDE_DIR}/sched/assimilator
+#   ${BOINC_INCLUDE_DIR}/sched/validate_util
+#   dna_assimilation_policy)
+#target_link_libraries(dna_assimilator ${UNDVC_COMMON_LIBRARY} ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(dna_work_generator dna_work_generator)
-target_link_libraries(dna_work_generator undvc_common ${BOINC_LIBRARIES} ${MYSQL_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(dna_work_generator ${UNDVC_COMMON_LIBRARY}
+    ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})

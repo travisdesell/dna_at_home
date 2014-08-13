@@ -39,8 +39,9 @@
 #include <iterator>
 
 
-#include "undvc_common/parse_xml.hxx"
-#include "undvc_common/file_io.hxx"
+//from undvc_common
+#include "parse_xml.hxx"
+#include "file_io.hxx"
 
 using std::string;
 using std::vector;
@@ -49,36 +50,92 @@ using std::ifstream;
 using std::string;
 using std::endl;
 
+struct ResultData {
+    char *current_sites;
+    char *current_samples;
+};
+
 int init_result(RESULT& result, void*& data) {
-    char *probabilities;
+    ResultData *rd = new ResultData[1];
 
-    try {
-        string prob_str = parse_xml<string>(result.stderr_out, "slice_probabilities");
+    //need to see if current samples are in a file
+    vector<OUTPUT_FILE_INFO> files;
 
-        replace( prob_str.begin(), prob_str.end(), '\n', ' ' );
+    int retval = get_output_file_infos(result, files);
+    if (retval) {
+        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: can't get output filenames\n", result.id, result.name);  
+        return retval;
+    }   
 
-        char chars[] = "\n\r";
-        for (unsigned int i = 0; i < strlen(chars); ++i) {
-            // you need include <algorithm> to use general algorithms like std::remove()
-            prob_str.erase (std::remove(prob_str.begin(), prob_str.end(), chars[i]), prob_str.end());
+    if (files.size() > 1) {
+        //some error, there should only be one file.
+        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: too many output filenames\n", result.id, result.name);  
+        exit(1);
+        return 1;
+
+    } else if (files.size() == 1) {
+        //theres one file, it will be the samples
+        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: need to read samples from output file\n", result.id, result.name);  
+
+        OUTPUT_FILE_INFO& fi = files[0];
+        ifstream samples_file(fi.path.c_str());
+
+        string current_samples, line;
+        while (getline(samples_file, line)) {
+            current_samples.append(line);
         }
 
-        probabilities = (char*)malloc(sizeof(char) * (strlen(prob_str.c_str()) + 1));
-        strcpy(probabilities, prob_str.c_str());
-        probabilities[strlen(prob_str.c_str())] = '\0';
+        current_samples.erase(std::remove(current_samples.begin(), current_samples.end(), '\r'), current_samples.end());
+        current_samples.erase(std::remove(current_samples.begin(), current_samples.end(), '\n'), current_samples.end());
 
-        cout << "probabilities: " << probabilities << endl;
+        rd->current_samples = new char[current_samples.size() + 1];
+
+        //sprintf appends the null character
+        strcpy(rd->current_samples, current_samples.c_str());
+
+        rd->current_samples[current_samples.size()] = '\0';
+
+    } else {
+        //no files, samples aren't being recorded yet
+        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: samples aren't recorded yet\n", result.id, result.name);  
+
+        rd->current_samples = (char*)malloc(sizeof(char) * 1);
+        rd->current_samples[0] = '\0';
+    }
+
+    try {
+        //need to get current_sites from XML
+        //need to get current_samples from file (if exists) -- maybe get it from XML as well?
+
+        //need to copy stderr_out into a string otherwise we get
+        //segmentation faults for reusing that data
+        string stderr_out(result.stderr_out);
+
+        string current_sites = parse_xml<string>(stderr_out, "current_sites");
+
+        //remove the \r from windows results
+        //you need include <algorithm> to use general algorithms like std::remove()
+        current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\r'), current_sites.end());
+        current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\n'), current_sites.end());
+
+        rd->current_sites = new char[current_sites.size() + 1];
+
+        //sprintf appends the null character
+        strcpy(rd->current_sites, current_sites.c_str());
+
+        rd->current_sites[current_sites.size()] = '\0';
+
     } catch (string error_message) {
-        log_messages.printf(MSG_CRITICAL, "wildlife_validation_policy get_data_from_result([RESULT#%d %s]) failed with error: %s\n", result.id, result.name, error_message.c_str());
+        log_messages.printf(MSG_CRITICAL, "dna_validation_policy get_data_from_result([RESULT#%d %s]) failed with error: %s\n", result.id, result.name, error_message.c_str());
         log_messages.printf(MSG_CRITICAL, "XML:\n%s\n", result.stderr_out);
         result.outcome = RESULT_OUTCOME_VALIDATE_ERROR;
         result.validate_state = VALIDATE_STATE_INVALID;
 
-//        exit(1);
+        exit(1);
         return ERR_XML_PARSE;
     }
 
-    data = (void*)probabilities;
+    data = (void*)rd;
 
     return 0;
 }
@@ -88,77 +145,38 @@ int compare_results(
     RESULT const& r2, void* data2,
     bool& match
 ) {
-    char *probabilities1 = (char*)data1;
-    char *probabilities2 = (char*)data2;
+    cerr << "COMPARING RESULTS!" << endl;
 
-    vector<double> p1;
-    istringstream iss1(probabilities1);
-    copy(istream_iterator<double>(iss1), istream_iterator<double>(), back_inserter<vector<double> >(p1));
-    
-    vector<double> p2;
-    istringstream iss2(probabilities2);
-    copy(istream_iterator<double>(iss2), istream_iterator<double>(), back_inserter<vector<double> >(p2));
+    ResultData *rd1 = (ResultData*)data1;
+    ResultData *rd2 = (ResultData*)data2;
 
-    if (p1.size() != p2.size()) {
-        match = false;
-        log_messages.printf(MSG_CRITICAL, "ERROR, number of probabilities is different. %d vs %d\n", (int)p1.size(), (int)p2.size());
+    if (strcmp(rd1->current_sites, rd2->current_sites) == 0) {
+        if (strcmp(rd1->current_samples, rd2->current_samples) == 0) {
+            log_messages.printf(MSG_CRITICAL, "sites and samples match!\n");
+            match = true;
+            return 0;
 
-        /*
-        log_messages.printf(MSG_CRITICAL, "p1 string: '%s'\n", probabilities1);
-        log_messages.printf(MSG_CRITICAL, "p2 string: '%s'\n", probabilities2);
-
-        log_messages.printf(MSG_CRITICAL, "probabilities1:\n");
-        for (uint32_t i = 0; i < p1.size(); i++) {
-            log_messages.printf(MSG_CRITICAL, "\t%lf\n", p1[i]);
-        }
-
-        log_messages.printf(MSG_CRITICAL, "probabilities2:\n");
-        for (uint32_t i = 0; i < p2.size(); i++) {
-            log_messages.printf(MSG_CRITICAL, "\t%lf\n", p2[i]);
-        }
-        */
-
-        match = false;
-
-        return 0;
-    }
-
-    double threshold = 0.026;
-
-    for (uint32_t i = 0; i < p1.size(); i++) {
-        if (fabs(p1[i] - p2[i]) > threshold) {
+        } else {
+            log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n%s\nvs\n%s\n", rd1->current_samples, rd2->current_samples);
             match = false;
-
-            /*
-            log_messages.printf(MSG_CRITICAL, "probabilities1:\n");
-            for (uint32_t j = 0; j < p1.size(); j++) {
-                log_messages.printf(MSG_CRITICAL, "\t%lf\n", p1[j]);
-            }
-
-            log_messages.printf(MSG_CRITICAL, "probabilities2:\n");
-            for (uint32_t j = 0; j < p2.size(); j++) {
-                log_messages.printf(MSG_CRITICAL, "\t%lf\n", p2[j]);
-            }
-            */
-
-            log_messages.printf(MSG_CRITICAL, "ERROR, difference in probabilities (%lf) exceeded threshold (%lf):\n", fabs(p1[i]-p2[i]), threshold);
-            log_messages.printf(MSG_CRITICAL, "probabilities1[%d]: %lf\n", i, p1[i]);
-            log_messages.printf(MSG_CRITICAL, "probabilities2[%d]: %lf\n", i, p2[i]);
-            exit(1);
-
             return 0;
         }
-    }
 
-    match = true;
+    } else {
+        log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n%s\nvs\n%s\n", rd1->current_sites, rd2->current_sites);
+        match = false;
+        return 0;
+    }
 
     return 0;
 }
 
 int cleanup_result(RESULT const& /*result*/, void* data) {
-    char* result = (char*)data;
+    ResultData* rd = (ResultData*)data;
 
-    delete result;
+    delete[] rd->current_samples;
+    delete[] rd->current_sites;
+    delete rd;
 
     return 0;
 }

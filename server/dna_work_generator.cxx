@@ -15,315 +15,288 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
 
-// sample_work_generator.cpp: an example BOINC work generator.
-// This work generator has the following properties
-// (you may need to change some or all of these):
+// sample_work_generator: example BOINC work generator.
+//
+// --app name               app name (default example_app)
+// --in_template_file       input template file (default example_app_in)
+// --out_template_file      output template file (default example_app_out)
+// -d N                     log verbosity level (0..4)
+// --help                   show usage
+// --version                show version
 //
 // - Runs as a daemon, and creates an unbounded supply of work.
-//   It attempts to maintain a "cushion" of 100 unsent job instances.
+//   It attempts to maintain a "cushion" of 100 unsent job instances
+//   for the given app.
 //   (your app may not work this way; e.g. you might create work in batches)
-// - Creates work for the application "example_app".
 // - Creates a new input file for each job;
 //   the file (and the workunit names) contain a timestamp
 //   and sequence number, so they're unique.
+//
+// This is an example - customize for your needs
 
+#include <sys/param.h>
 #include <unistd.h>
 #include <cstdlib>
-#include <string>
 #include <cstring>
-#include <sstream>
-#include <cmath>
-#include <iostream>
 
+#include <limits>
+
+#include <fstream>
+using std::ifstream;
+using std::getline;
+
+#include <sstream>
+using std::ostringstream;
+#include <iostream>
+using std::cout;
+using std::cerr;
+using std::endl;
+
+#include <vector>
+using std::vector;
+
+#include <string>
+using std::string;
+
+#include "backend_lib.h"
 #include "boinc_db.h"
 #include "error_numbers.h"
-#include "backend_lib.h"
+#include "filesys.h"
 #include "parse.h"
-#include "util.h"
+#include "str_replace.h"
+#include "str_util.h"
 #include "svn_version.h"
+#include "util.h"
 
 #include "sched_config.h"
 #include "sched_util.h"
 #include "sched_msgs.h"
-#include "str_util.h"
 
 #include "mysql.h"
 
-#include <boost/multiprecision/gmp.hpp>
+//from undvc_common
+#include "file_io.hxx"
 
-#include "../common/n_choose_k.hpp"
-
-#define CUSHION 500
+#define CUSHION 100
     // maintain at least this many unsent results
-#define REPLICATION_FACTOR  1
+#define REPLICATION_FACTOR  2
+    // number of instances of each job
 
-const char* app_name = "subset_sum";
-const char* in_template_file = "subset_sum_in.xml";
-const char* out_template_file = "subset_sum_out.xml";
+const char* app_name = "gibbs";
+const char* initial_workunit_xml_filename = "mtuberculosis_wu_initial_1.xml";
+const char* checkpoint_workunit_xml_filename = "mtuberculosis_wu_checkpoint_1.xml";
+const char* result_xml_filename = "mtuberculosis_result_1.xml";
 
 char* in_template;
 DB_APP app;
 int start_time;
 int seqno;
 
-//const uint64_t SETS_PER_WORKUNIT = 2203961430;
-const uint64_t SETS_PER_WORKUNIT = 2203960;
+/**
+ *  This wrapper makes for much more informative error messages when doing MYSQL queries
+ */
+#define mysql_query_check(conn, query) __mysql_check (conn, query, __FILE__, __LINE__)
 
-using namespace std;
-using boost::multiprecision::mpz_int;
+void __mysql_check(MYSQL *conn, string query, const char *file, const int line) {
+    mysql_query(conn, query.c_str());
 
+    if (mysql_errno(conn) != 0) {
+        ostringstream ex_msg;
+        ex_msg << "ERROR in MySQL query: '" << query.c_str() << "'. Error: " << mysql_errno(conn) << " -- '" << mysql_error(conn) << "'. Thrown on " << file << ":" << line;
+        cerr << ex_msg.str() << endl;
+        exit(1);
+    }
+}
+
+int get_number_nucleotides(string sequence_filename) {
+    ifstream sequence_file(sequence_filename.c_str());
+
+    int number_nucleotides = 0;
+    int line_number = 0;
+    string line;
+    while (getline(sequence_file, line)) {
+        if (line.size() == 0) continue;
+        if (line[0] == '>') continue;
+        if (line.find_first_not_of(' ') == string::npos) continue;
+        if (line.find_first_not_of("ACGT") != string::npos) {
+            cerr << "ERROR: malformed sequence file: '" << sequence_filename << "'" << endl;
+            cerr << "Nucleotide that was not A, C, G or T." << endl;
+            cerr << "Problem on line: " << line_number << endl;
+            cerr << "line: '" << line << "'" << endl;
+            continue;
+        }
+
+        number_nucleotides += line.size();
+        line_number++;
+    }
+    cerr << "number_nucleotides: " << number_nucleotides << endl;
+
+    return number_nucleotides;
+}
 
 // create one new job
-//
-int make_job(uint32_t max_set_value, uint32_t set_size, mpz_int starting_set, mpz_int sets_to_evaluate) {
-    DB_WORKUNIT wu;
+int create_workunit(MYSQL *conn, const string &sampler_name, const string &sequences_filename,
+                    int sampler_id, int wu_num, string command_line, double rsc_fpops_est, double rsc_fpops_bound,
+                    double rsc_memory_bound, double rsc_disk_bound, double delay_bound) {
 
-    char name[256], path[256];
-    char command_line[512];
-    char additional_xml[512];
-    const char* infiles[0];
+    DB_WORKUNIT wu;
+    char name[256], path[MAXPATHLEN];
+    const char* infiles[1];
     int retval;
 
-    int current_time = time(NULL);
-
     // make a unique name (for the job and its input file)
-    ostringstream oss;
-    oss << app_name << "_" << max_set_value << "_" << set_size << "_" << starting_set << "_" << current_time;
-    sprintf(name, "%s", oss.str().c_str());
-//    fprintf(stdout, "name: '%s'\n", name);
+    ostringstream wu_name;
+    wu_name << app_name << "_" << sampler_name << "_" << wu_num << "_0";
 
-    // Create the input file.
-    // Put it at the right place in the download dir hierarchy
-    //
-    retval = config.download_path(name, path);
-    if (retval) return retval;
-    FILE* f = fopen(path, "w");
-    if (!f) return ERR_FOPEN;
-    fprintf(f, "This is the input file for job %s", name);
-    fclose(f);
-
-    double fpops_per_set = set_size * log(max_set_value) * 1e4 * 0.3;         //TODO: figure out an estimate of how many fpops per set calculation
-    double fpops_est = fpops_per_set * SETS_PER_WORKUNIT;
-
-    double credit = fpops_est / (2.5 * 10e10);
+    sprintf(name, "%s", wu_name.str().c_str());   //should probably make this more descriptive
 
     // Fill in the job parameters
-    //
     wu.clear();
     wu.appid = app.id;
-    strcpy(wu.name, name);
-    wu.rsc_fpops_est = fpops_est;
-    wu.rsc_fpops_bound = fpops_est * 100;
-    wu.rsc_memory_bound = 1e8;
-    wu.rsc_disk_bound = 1e8;
-    wu.delay_bound = 86400;
+    safe_strcpy(wu.name, name);
+    wu.rsc_fpops_est = rsc_fpops_est;
+    wu.rsc_fpops_bound = rsc_fpops_bound;
+    wu.rsc_memory_bound = rsc_memory_bound;
+    wu.rsc_disk_bound = rsc_disk_bound; //50MB
+    wu.delay_bound = delay_bound;
     wu.min_quorum = REPLICATION_FACTOR;
     wu.target_nresults = REPLICATION_FACTOR;
     wu.max_error_results = REPLICATION_FACTOR*4;
     wu.max_total_results = REPLICATION_FACTOR*8;
     wu.max_success_results = REPLICATION_FACTOR*4;
-//    infiles[0] = name;
+    wu.batch = sampler_id;
+
+    //for initial workunits, the input file is only the sequencesFilename
+    //for continuation workunits, there is the sequencesFilename and the final checkpoint of the previous workunit
+
+    string only_filename = sequences_filename.substr(sequences_filename.find_last_of("/\\") + 1);
+    cerr << "infile: '" << only_filename << "'" << endl;
+    infiles[0] = only_filename.c_str();
+
+    //need to make a gibbs_walk in the database and initialize these
+    int burn_in_depth = 0;  //burn in depth is initially 0 as this is a new walk
+    int seed = (int)(drand() * std::numeric_limits<int>::max());
+
+    //random seed needs to be appended to the command line
+    ostringstream extra_options;
+    extra_options << " --seed " << seed;
+    command_line.append(extra_options.str());
+
+    //insert this gibbs_walk into the database
+    ostringstream query;
+    query   << "INSERT INTO gibbs_walk SET "
+            << "seed = " << seed
+            << ", sampler_id = " << sampler_id
+            << ", burn_in_depth = " << burn_in_depth
+            << ", current_sites = ''";
+    mysql_query_check(conn, query.str().c_str());
+
+    int walk_id = mysql_insert_id(conn);   //need to get this after inserting the walk into the database
+
+    ostringstream additional_xml;
+    additional_xml << "<seed>" << seed << "</seed>"
+                   << "<sampler_id>" << sampler_id << "</sampler_id>"
+                   << "<walk_id>" << walk_id << "</walk_id>"
+                   << "<burn_in_depth>" << burn_in_depth << "</burn_in_depth>";
+
+    cerr << "additional_xml: '" << additional_xml.str() << "'" << endl;
 
     // Register the job with BOINC
-    //
-    sprintf(path, "templates/%s", out_template_file);
-
-    oss.clear();
-    oss.str("");    //reset the ostringstream
-    oss << " " << max_set_value << " " << set_size << " " << starting_set << " " << sets_to_evaluate;
-    sprintf(command_line, "%s", oss.str().c_str());
-
-//    fprintf(stdout, "command line: '%s'\n", command_line);
-
-//    uint64_t total_sets = n_choose_k(max_set_value - 1, set_size - 1);
-//    fprintf(stdout, "total sets: %lu, starting_set + sets_to_evaluate: %lu\n", total_sets, starting_set + sets_to_evaluate);
-
-    sprintf(additional_xml, "<credit>%.3lf</credit>", credit);
-
-    return create_work(
+    sprintf(path, "templates/%s", result_xml_filename);
+    retval = create_work(
         wu,
-        in_template,
-        path,
+        in_template,                    //input template file
+        path,                           //result template file path
         config.project_path(path),
-        infiles,
-        0,
+        infiles,                        //input files
+        1,                              //number of input files
         config,
-        command_line,
-        additional_xml
+        command_line.c_str(),
+        additional_xml.str().c_str()
     );
-    return 1;
+
+    return retval;
 }
 
-void make_jobs(uint32_t max_set_value, uint32_t set_size) {
-    int unsent_results;
-    int retval;
+void main_loop(const vector<string> &arguments, MYSQL *conn) {
+    string sampler_name = arguments[1];
+    string sequences_filename = arguments[2];
+    int number_walks = atoi(arguments[3].c_str());
 
-    cout << "making jobs" << endl;
+    int workunit_burn_in = 100000;
+    int workunit_samples = 0;
+    int burn_in          = 1000000;             //burn in for the full walk
+    int samples          = 1000000;             //samples to be taken for the full walk
 
-    check_stop_daemons();   //This checks to see if there is a stop in place, if there is it will exit the work generator.
+    //check to see if the server is stopped
+    check_stop_daemons();
 
-    cout << "checked stop daemons" << endl;
+    int numberNucleotides = get_number_nucleotides(sequences_filename);
 
-	//Aaron Comment: retval tells us if the count_unsent_results
-	//function is working properly. If it is, then it's value
-	//should be 0. Anything creater than 0 and the program exits.
-    retval = count_unsent_results(unsent_results, 0);
-    if (retval) {
-        log_messages.printf(MSG_CRITICAL,
-            "count_unsent_jobs() failed: %s\n", boincerror(retval)
-        );
-        exit(retval);
-    }
+    int numberMotifs = 2;
+    int modelWidth = 16;
+    ostringstream motif_string;
+    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " ";
+    int maxSites = 3;
 
-    //divide up the sets into mostly equal sized workunits
+    //Make sure the sequences filename is in the download directory
+    copy_file_to_download_dir(sequences_filename);
 
-    mpz_int total_sets = n_choose_k(max_set_value - 1, set_size - 1);
-    mpz_int current_set = 0;
-    mpz_int total_generated = 0;
+    double rsc_fpops_est = ((double)(workunit_burn_in + workunit_samples)) * (double)numberNucleotides * numberMotifs * (1.0 + (2.0 *     modelWidth) + maxSites);
 
-    cout << "current set: " << current_set << ", total sets: " << total_sets << endl;
+    cerr << ": " << (workunit_burn_in + workunit_samples) << endl;
+    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides) << endl;
+    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides * numberMotifs) << endl;
+    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides * numberMotifs * (1.0 + (2.0 * modelWidth) + maxSites)) << endl;
 
-    while (current_set < total_sets) {
-        if (total_generated >= 2000) break;  //don't generate too many yet
+    rsc_fpops_est *= 10.0;
+    double rsc_fpops_bound = rsc_fpops_est * 100.0;
+    double rsc_memory_bound = 5e7;
+    double rsc_disk_bound = 50 * 1024 * 1024; //50MB
+    double delay_bound = 86400;
 
-        if ((total_sets - current_set) > SETS_PER_WORKUNIT) {
-            cout << "making job: " << max_set_value << " choose " << set_size << ", current set: " << current_set << ", sets to compute: " << SETS_PER_WORKUNIT << endl;
-            make_job(max_set_value, set_size, current_set, SETS_PER_WORKUNIT);
-        } else {
-            cout << "making job: " << max_set_value << " choose " << set_size << ", current set: " << current_set << ", sets to compute: " << (total_sets - current_set) << endl;
-            make_job(max_set_value, set_size, current_set, total_sets - current_set);
-        }
-        current_set += SETS_PER_WORKUNIT;
+    cerr << "NEW RSC_FPOPS_EST = " << rsc_fpops_est << endl;
 
-        total_generated++;
-    }
+    ostringstream command_line;
+    command_line << " --max_sites " << maxSites
+                 << " --blocks 0.1 0.3 0.3 0.3"
+                 << " --motifs " + motif_string.str()
+                 << " --enable_shifting 2 5"
+                 << " --print_best_sites 0.1"
+                 << " --print_current_sites"
+                 << " --print_accumulated_samples"
+                 << " --sequence_file sequences.txt"
+                 << " --sample_period " << workunit_samples
+                 << " --burn_in_period " << workunit_burn_in;
 
-    //quit to not do anything
-    exit(0);
 
-    /**
-     *  Update create an entry in sss_runs table for this M and N
-     */
+    //insert the new gibbs sampler into the database
     ostringstream query;
-    query << "INSERT INTO sss_runs SET "
-          << "max_value =  " << max_set_value << ", "
-          << "subset_size = " << set_size << ", "
-          << "slices = " << total_generated << ", "
-          << "completed = 0, errors = 0";
+    query   << "INSERT INTO gibbs_sampler SET name = '" << sampler_name << "'"
+            << ", initial_workunit_xml_filename = '" << initial_workunit_xml_filename << "'" 
+            << ", checkpoint_workunit_xml_filename = '" << checkpoint_workunit_xml_filename << "'"
+            << ", result_xml_filename = '" << result_xml_filename << "'"
+            << ", sequences_filename = '" << sequences_filename << "'"
+            << ", number_walks = " << number_walks
+            << ", burn_in = " << burn_in
+            << ", samples = " << samples
+            << ", current_samples = " << 0
+            << ", workunit_burn_in = " << workunit_burn_in
+            << ", workunit_samples = " << workunit_samples
+            << ", command_line_options = '" << command_line.str().c_str() << "'"
+            << ", rsc_fpops_est = " << rsc_fpops_est
+            << ", rsc_fpops_bound = " << rsc_fpops_bound
+            << ", rsc_disk_bound = " << rsc_disk_bound
+            << ", rsc_memory_bound = " << rsc_memory_bound
+            << ", delay_bound = " << delay_bound;
 
-    log_messages.printf(MSG_NORMAL, "%s\n", query.str().c_str());
-    mysql_query(boinc_db.mysql, query.str().c_str()); 
+    mysql_query_check(conn, query.str().c_str());
+    int sampler_id = mysql_insert_id(conn); //get this from inserting the gibbs_walk into the database
 
-    if (mysql_errno(boinc_db.mysql) != 0) {
-        log_messages.printf(MSG_CRITICAL, "ERROR: could not insert into sss_runs with query: '%s'. Error: %d -- '%s'. Thrown on %s:%d\n", query.str().c_str(), mysql_errno(boinc_db.mysql), mysql_error(boinc_db.mysql), __FILE__, __LINE__);
-        exit(1);
+    for (int i = 0; i < number_walks; i++) {
+        create_workunit(conn, sampler_name, sequences_filename, sampler_id, i, command_line.str(), rsc_fpops_est, rsc_fpops_bound, rsc_memory_bound, rsc_disk_bound, delay_bound);
     }
-
-
-    ostringstream oss;
-    oss << total_generated;
-    log_messages.printf(MSG_DEBUG, "workunits generated: %s\n", oss.str().c_str());
 }
-
-void main_loop() {
-    int retval;
-
-    /**
-     *  Get max_set_value and subset_size from sss_progress table
-     */
-    uint32_t max_set_value, subset_size;
-
-    ostringstream query;
-    query << "SELECT current_max_value, current_subset_size FROM sss_progress";
-
-    log_messages.printf(MSG_NORMAL, "%s\n", query.str().c_str());
-    mysql_query(boinc_db.mysql, query.str().c_str());
-    MYSQL_RES *result = mysql_store_result(boinc_db.mysql);
-
-    if (mysql_errno(boinc_db.mysql) != 0) {
-        log_messages.printf(MSG_CRITICAL, "ERROR: getting sss_progress: '%s'. Error: %d -- '%s'. Thrown on %s:%d\n", query.str().c_str(), mysql_errno(boinc_db.mysql), mysql_error(boinc_db.mysql), __FILE__, __LINE__);
-        exit(1);
-    }   
-
-    MYSQL_ROW row = mysql_fetch_row(result);
-    if (mysql_errno(boinc_db.mysql) != 0) {
-        log_messages.printf(MSG_CRITICAL, "ERROR: getting sss_progress: '%s'. Error: %d -- '%s'. Thrown on %s:%d\n", query.str().c_str(), mysql_errno(boinc_db.mysql), mysql_error(boinc_db.mysql), __FILE__, __LINE__);
-    } else if (row == NULL) {
-        log_messages.printf(MSG_CRITICAL, "ERROR: getting sss_progres: '%s'. Error: %d -- '%s'. Thrown on %s:%d\n", query.str().c_str(), mysql_errno(boinc_db.mysql), mysql_error(boinc_db.mysql), __FILE__, __LINE__);
-        log_messages.printf(MSG_CRITICAL, "returned NULL for rows.\n");
-        exit(1);
-    }   
-
-    max_set_value = atoi(row[0]);
-    subset_size = atoi(row[1]);
-    mysql_free_result(result);
-
-    cout << "max_set_value: " << max_set_value << endl;
-    cout << "subset_size: " << subset_size << endl;
-
-    while (1) {
-        check_stop_daemons();
-
-        int n;
-        retval = count_unsent_results(n, app.id);
-
-        if (retval) {
-            log_messages.printf(MSG_CRITICAL,"count_unsent_jobs() failed: %s\n", boincerror(retval));
-            exit(retval);
-        }   
-
-        if (n > CUSHION) {
-            sleep(30);
-        } else {
-            log_messages.printf(MSG_DEBUG, "%d results are available, with a cushion of %d\n", n, CUSHION);
-
-            make_jobs(max_set_value, subset_size);
-
-            subset_size++;
-
-            //If the set is odd, and the set size is > the (max_set_value - 1) / 2 or
-            //if the set is even and the set size is > max_set_value / 2, increase the max value
-            //and update the set size, ex:
-            //max_set_value = 32, set sizes should be 16, 17, 18
-            //max_set_value = 33, set sizes should be 16, 17, 18
-            //max_set_value = 34, set sizes should be 17, 18, 19
-            //etc.
-            if (max_set_value % 2 == 0) { //even
-                if (subset_size > (max_set_value / 2) + 2) {
-                    subset_size -= 3;
-                    max_set_value++;
-                }
-            } else { //odd
-                if (subset_size > ((max_set_value - 1) / 2) + 2) {
-                    subset_size -= 2;
-                    max_set_value++;
-                }
-            }
-
-            //Now actually update the database
-            query.str("");
-            query.clear();
-            query << "UPDATE sss_progress SET "
-                << "current_max_value = " << max_set_value << ", "
-                << "current_subset_size = " << subset_size;
-
-            log_messages.printf(MSG_NORMAL, "%s\n", query.str().c_str());
-            mysql_query(boinc_db.mysql, query.str().c_str()); 
-
-            if (mysql_errno(boinc_db.mysql) != 0) {
-                log_messages.printf(MSG_CRITICAL, "ERROR: could not update sss_progress with query: '%s'. Error: %d -- '%s'. Thrown on %s:%d\n", query.str().c_str(), mysql_errno(boinc_db.mysql), mysql_error(boinc_db.mysql), __FILE__, __LINE__);
-                exit(1);
-            }   
-
-
-            // Now sleep for a few seconds to let the transitioner
-            // create instances for the jobs we just created.
-            // Otherwise we could end up creating an excess of jobs.
-            sleep(30);
-        }   
-    }   
-}
-
 
 void usage(char *name) {
     fprintf(stderr, "This is an example BOINC work generator.\n"
@@ -337,12 +310,12 @@ void usage(char *name) {
         "  and sequence number, so that they're unique.\n\n"
         "Usage: %s [OPTION]...\n\n"
         "Options:\n"
-        "  --app X                      Application name (default: example_app)\n"
-        "  --in_template_file           Input template (default: example_app_in)\n"
-        "  --out_template_file          Output template (default: example_app_out)\n"
-        "  [ -d X ]                     Sets debug level to X.\n"
-        "  [ -h | --help ]              Shows this help text.\n"
-        "  [ -v | --version ]           Shows version information.\n",
+        "  [ --app X                Application name (default: example_app)\n"
+        "  [ --in_template_file     Input template (default: example_app_in)\n"
+        "  [ --out_template_file    Output template (default: example_app_out)\n"
+        "  [ -d X ]                 Sets debug level to X.\n"
+        "  [ -h | --help ]          Shows this help text.\n"
+        "  [ -v | --version ]       Shows version information.\n",
         name
     );
 }
@@ -351,7 +324,6 @@ int main(int argc, char** argv) {
     int i, retval;
     char buf[256];
 
-//Aaron Comment: command line flags are explained in descriptions above.
     for (i=1; i<argc; i++) {
         if (is_arg(argv[i], "d")) {
             if (!argv[++i]) {
@@ -362,30 +334,23 @@ int main(int argc, char** argv) {
             int dl = atoi(argv[i]);
             log_messages.set_debug_level(dl);
             if (dl == 4) g_print_queries = true;
-        } else if (!strcmp(argv[i], "--app")) {
-            app_name = argv[++i];
-        } else if (!strcmp(argv[i], "--in_template_file")) {
-            in_template_file = argv[++i];
-        } else if (!strcmp(argv[i], "--out_template_file")) {
-            out_template_file = argv[++i];
         } else if (is_arg(argv[i], "h") || is_arg(argv[i], "help")) {
             usage(argv[0]);
             exit(0);
         } else if (is_arg(argv[i], "v") || is_arg(argv[i], "version")) {
             printf("%s\n", SVN_VERSION);
             exit(0);
-
-        } else {
-            log_messages.printf(MSG_CRITICAL, "unknown command line argument: %s\n\n", argv[i]);
-            usage(argv[0]);
-            exit(1);
+//        } else {
+//            log_messages.printf(MSG_CRITICAL, "unknown command line argument: %s\n\n", argv[i]);
+//            usage(argv[0]);
+//            exit(1);
         }
     }
 
-//Aaron Comment: if at any time the retval value is greater than 0, then the program
-//has failed in some manner, and the program then exits.
+    //Aaron Comment: if at any time the retval value is greater than 0, then the program
+    //has failed in some manner, and the program then exits.
 
-//Aaron Comment: processing project's config file.
+    //Aaron Comment: processing project's config file.
     retval = config.parse_file();
     if (retval) {
         log_messages.printf(MSG_CRITICAL,
@@ -394,38 +359,34 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-//Aaron Comment: opening connection to database.
-    retval = boinc_db.open(
-        config.db_name, config.db_host, config.db_user, config.db_passwd
-    );
+    //Aaron Comment: opening connection to database.
+    retval = boinc_db.open(config.db_name, config.db_host, config.db_user, config.db_passwd);
     if (retval) {
         log_messages.printf(MSG_CRITICAL, "can't open db\n");
         exit(1);
     }
 
-//Aaron Comment: looks for applicaiton to be run. If not found, program exits.
+    //Aaron Comment: looks for applicaiton to be run. If not found, program exits.
     sprintf(buf, "where name='%s'", app_name);
     if (app.lookup(buf)) {
         log_messages.printf(MSG_CRITICAL, "can't find app %s\n", app_name);
         exit(1);
     }
 
-//Aaron Comment: looks for work templates, if cannot find, or are corrupted,
-//the program exits.
-    sprintf(buf, "templates/%s", in_template_file);
+    //Aaron Comment: looks for work templates, if cannot find, or are corrupted,
+    //the program exits.
+    sprintf(buf, "templates/%s", initial_workunit_xml_filename);
     if (read_file_malloc(config.project_path(buf), in_template)) {
         log_messages.printf(MSG_CRITICAL, "can't read input template %s\n", buf);
         exit(1);
     }
 
-//Aaron Comment: if work generator passes all startup tests, the main work gneration
-//loop is called.
+    //Aaron Comment: if work generator passes all startup tests, the main work gneration
+    //loop is called.
     start_time = time(0);
     seqno = 0;
 
     log_messages.printf(MSG_NORMAL, "Starting\n");
 
-    n_choose_k_init(100, 50);   //this should be more than enough
-
-    main_loop();
+    main_loop(vector<string>(argv, argv + argc), boinc_db.mysql);
 }
