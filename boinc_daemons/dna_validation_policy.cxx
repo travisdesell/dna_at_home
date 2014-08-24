@@ -131,7 +131,10 @@ int init_result(RESULT& result, void*& data) {
         result.outcome = RESULT_OUTCOME_VALIDATE_ERROR;
         result.validate_state = VALIDATE_STATE_INVALID;
 
-        exit(1);
+        rd->current_sites = new char[1];
+        rd->current_sites[0] = '\0';
+        data = (void*)rd;
+
         return ERR_XML_PARSE;
     }
 
