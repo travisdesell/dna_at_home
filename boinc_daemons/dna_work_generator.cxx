@@ -118,9 +118,9 @@ int get_number_nucleotides(string sequence_filename) {
         if (line.size() == 0) continue;
         if (line[0] == '>') continue;
         if (line.find_first_not_of(' ') == string::npos) continue;
-        if (line.find_first_not_of("ACGT") != string::npos) {
+        if (line.find_first_not_of("ACGTacgt") != string::npos) {
             cerr << "ERROR: malformed sequence file: '" << sequence_filename << "'" << endl;
-            cerr << "Nucleotide that was not A, C, G or T." << endl;
+            cerr << "Nucleotide that was not A, C, G, T, a c g or t." << endl;
             cerr << "Problem on line: " << line_number << endl;
             cerr << "line: '" << line << "'" << endl;
             continue;
@@ -223,25 +223,25 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     string sequences_filename = arguments[2];
     int number_walks = atoi(arguments[3].c_str());
 
-    int workunit_steps   = 100000;
+    int workunit_steps   = 10000;
     int burn_in          = 0;                   //burn in for the full walk
-    int samples          = 1000000;             //samples to be taken for the full walk
+    int samples          = 100000;             //samples to be taken for the full walk
 
     //check to see if the server is stopped
     check_stop_daemons();
 
     int numberNucleotides = get_number_nucleotides(sequences_filename);
 
-    int numberMotifs = 2;
-    int modelWidth = 16;
+    int numberMotifs = 4;
+    int modelWidth = 6;
     ostringstream motif_string;
-    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " ";
-    int maxSites = 3;
+    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " forward," << modelWidth << " reverse," << modelWidth << " ";
+    int maxSites = 4;
 
     //Make sure the sequences filename is in the download directory
     copy_file_to_download_dir(sequences_filename);
 
-    double rsc_fpops_est = ((double)(workunit_steps)) * (double)numberNucleotides * numberMotifs * (1.0 + (2.0 *     modelWidth) + maxSites);
+    double rsc_fpops_est = ((double)(workunit_steps)) * (double)numberNucleotides * numberMotifs * (1.0 + (2.0 * modelWidth) + maxSites);
 
     cerr << ": " << workunit_steps << endl;
     cerr << ": " << (workunit_steps * numberNucleotides) << endl;
@@ -265,12 +265,13 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
 
     ostringstream command_line;
     command_line << " --max_sites " << maxSites
-                 << " --blocks 0.1 0.3 0.3 0.3"
+                 << " --blocks  0.1 0.225 0.225 0.225 0.225"
                  << " --motifs " + motif_string.str()
                  << " --enable_shifting 2 5"
                  << " --print_best_sites 0.1"
                  << " --print_current_sites"
-                 << " --print_accumulated_samples"
+//                 << " --print_accumulated_samples"
+                 << " --checkpoint_frequency 1000"
                  << " --sequence_file sequences.txt"
                  << " --burn_in_period " << workunit_burn_in
                  << " --sample_period " << workunit_samples;
