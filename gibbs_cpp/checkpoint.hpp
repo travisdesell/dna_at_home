@@ -11,6 +11,7 @@
 using namespace std;
 
 void write_sites(string filename, vector<Sequence*> *sequences, int seed, int iteration, int indendent_walk);
+void write_final_sites(string filename, vector<Sequence*> *sequences);
 void write_sites_to_file(ostream &out, const char *delimiter, vector<Sequence*> *sequences);
 
 int read_sites_from_checkpoint(string checkpoint_filename, vector<Sequence*> *sequences, int &seed, int &iteration, int &independent_walk);

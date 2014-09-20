@@ -44,6 +44,7 @@
 #include "phylogeny.hpp"
 
 #define SITES_CHECKPOINT_FILE "gibbs_sites_checkpoint.txt"
+#define SITES_OUTPUT_FILE "final_sites.txt"
 #define SAMPLES_CHECKPOINT_FILE "gibbs_samples_checkpoint.txt"
 #define SAMPLES_OUTPUT_FILE "accumulated_samples.txt"
 
@@ -124,6 +125,7 @@ int main(int argc, char** argv) {
     int burn_in_period = 0;
     int sites_from_arguments = 0;
     double tt_factor = 0.0;
+    int checkpoint_frequency = 5000;
 
     vector<string> arguments(argv, argv + argc);
 
@@ -153,6 +155,7 @@ int main(int argc, char** argv) {
     get_argument(arguments, "--print_best_sites", false, print_best_sites);
     get_argument(arguments, "--total_independent_walks", false, total_independent_walks);
     get_argument(arguments, "--print_current_sites_frequency", false, print_current_sites_frequency);
+    get_argument(arguments, "--checkpoint_frequency", false, checkpoint_frequency);
     int print_current_sites_frequency_initial = print_current_sites_frequency;
 
     bool print_current_sites                = argument_exists(arguments, "--print_current_sites");
@@ -391,7 +394,7 @@ int main(int argc, char** argv) {
             }
 
 //            if (i % 5 == 0 && i != 0) {
-            if (i % 5000 == 0 && i != 0) {
+            if (i % checkpoint_frequency == 0 && i != 0) {
                 write_sites(string(SITES_CHECKPOINT_FILE), sequences, seed, i + 1, independent_walk);
                 
                 if (i >= burn_in_period) {
@@ -452,6 +455,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "</current_samples>\n");
         }
 
+        write_final_sites(string(SITES_OUTPUT_FILE), sequences);
         if (sample_period > 0) write_accumulated_samples(string(SAMPLES_OUTPUT_FILE), sequences);
 
         if (print_motif_models) {
