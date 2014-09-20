@@ -48,6 +48,31 @@ void write_sites(string filename, vector<Sequence*> *sequences, int seed, int it
     checkpoint_file.close();
 }
 
+void write_final_sites(string filename, vector<Sequence*> *sequences) {
+#ifdef _BOINC_
+    string output_path;
+    int retval = boinc_resolve_filename_s(filename.c_str(), output_path);
+    
+    if (retval) {
+        fprintf(stderr, "APP: error writing final sites (resolving file name)\n");
+        return;
+    }
+
+    ofstream checkpoint_file(output_path.c_str());
+#else
+    ofstream checkpoint_file(filename.c_str());
+#endif
+    if (!checkpoint_file.is_open()) {
+        fprintf(stderr, "APP: error writing final sites (opening checkpoint file)\n");
+        return;
+    }
+
+    write_sites_to_file(checkpoint_file, ".\n", sequences);
+
+    checkpoint_file.close();
+}
+
+
 void write_sites_to_file(ostream &out, const char *delimiter, vector<Sequence*> *sequences) {
     bool already_printed = false;
 
