@@ -202,7 +202,11 @@ int main(int argc, char** argv) {
      *  Calculate the background probabilities since we only need to do this once.
      */
     calculate_background_nucleotide_probabilities(sequences);
-    if (sites_file.compare("") != 0) read_sites(sites_file, sequences);
+    if (sites_file.compare("") != 0) {
+        sites_from_arguments = 1;
+        cerr << "Reading sites file: " << sites_file << endl;
+        read_sites(sites_file, sequences);
+    }
 
     vector<MotifModel> motif_models;
     initialize_motif_models(motif_models, motif_info);
