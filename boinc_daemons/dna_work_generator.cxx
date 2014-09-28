@@ -118,9 +118,9 @@ int get_number_nucleotides(string sequence_filename) {
         if (line.size() == 0) continue;
         if (line[0] == '>') continue;
         if (line.find_first_not_of(' ') == string::npos) continue;
-        if (line.find_first_not_of("ACGT") != string::npos) {
+        if (line.find_first_not_of("ACGTacgt") != string::npos) {
             cerr << "ERROR: malformed sequence file: '" << sequence_filename << "'" << endl;
-            cerr << "Nucleotide that was not A, C, G or T." << endl;
+            cerr << "Nucleotide that was not A, C, G, T, a c g or t." << endl;
             cerr << "Problem on line: " << line_number << endl;
             cerr << "line: '" << line << "'" << endl;
             continue;
@@ -174,7 +174,7 @@ int create_workunit(MYSQL *conn, const string &sampler_name, const string &seque
     infiles[0] = only_filename.c_str();
 
     //need to make a gibbs_walk in the database and initialize these
-    int burn_in_depth = 0;  //burn in depth is initially 0 as this is a new walk
+    int current_steps = 0;  //current_steps is initially 0 as this is a new walk
     int seed = (int)(drand() * std::numeric_limits<int>::max());
 
     //random seed needs to be appended to the command line
@@ -187,7 +187,7 @@ int create_workunit(MYSQL *conn, const string &sampler_name, const string &seque
     query   << "INSERT INTO gibbs_walk SET "
             << "seed = " << seed
             << ", sampler_id = " << sampler_id
-            << ", burn_in_depth = " << burn_in_depth
+            << ", current_steps = " << current_steps
             << ", current_sites = ''";
     mysql_query_check(conn, query.str().c_str());
 
@@ -197,7 +197,7 @@ int create_workunit(MYSQL *conn, const string &sampler_name, const string &seque
     additional_xml << "<seed>" << seed << "</seed>"
                    << "<sampler_id>" << sampler_id << "</sampler_id>"
                    << "<walk_id>" << walk_id << "</walk_id>"
-                   << "<burn_in_depth>" << burn_in_depth << "</burn_in_depth>";
+                   << "<current_steps>" << current_steps << "</current_steps>";
 
     cerr << "additional_xml: '" << additional_xml.str() << "'" << endl;
 
@@ -223,31 +223,30 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     string sequences_filename = arguments[2];
     int number_walks = atoi(arguments[3].c_str());
 
-    int workunit_burn_in = 100000;
-    int workunit_samples = 0;
-    int burn_in          = 1000000;             //burn in for the full walk
-    int samples          = 1000000;             //samples to be taken for the full walk
+    int workunit_steps   = 10000;
+    int burn_in          = 0;                   //burn in for the full walk
+    int samples          = 500000;             //samples to be taken for the full walk
 
     //check to see if the server is stopped
     check_stop_daemons();
 
     int numberNucleotides = get_number_nucleotides(sequences_filename);
 
-    int numberMotifs = 2;
-    int modelWidth = 16;
+    int numberMotifs = 4;
+    int modelWidth = 6;
     ostringstream motif_string;
-    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " ";
-    int maxSites = 3;
+    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " forward," << modelWidth << " reverse," << modelWidth << " ";
+    int maxSites = 4;
 
     //Make sure the sequences filename is in the download directory
     copy_file_to_download_dir(sequences_filename);
 
-    double rsc_fpops_est = ((double)(workunit_burn_in + workunit_samples)) * (double)numberNucleotides * numberMotifs * (1.0 + (2.0 *     modelWidth) + maxSites);
+    double rsc_fpops_est = ((double)(workunit_steps)) * (double)numberNucleotides * numberMotifs * (1.0 + (2.0 * modelWidth) + maxSites);
 
-    cerr << ": " << (workunit_burn_in + workunit_samples) << endl;
-    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides) << endl;
-    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides * numberMotifs) << endl;
-    cerr << ": " << ((workunit_burn_in + workunit_samples) * numberNucleotides * numberMotifs * (1.0 + (2.0 * modelWidth) + maxSites)) << endl;
+    cerr << ": " << workunit_steps << endl;
+    cerr << ": " << (workunit_steps * numberNucleotides) << endl;
+    cerr << ": " << (workunit_steps * numberNucleotides * numberMotifs) << endl;
+    cerr << ": " << (workunit_steps * numberNucleotides * numberMotifs * (1.0 + (2.0 * modelWidth) + maxSites)) << endl;
 
     rsc_fpops_est *= 10.0;
     double rsc_fpops_bound = rsc_fpops_est * 100.0;
@@ -257,17 +256,25 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
 
     cerr << "NEW RSC_FPOPS_EST = " << rsc_fpops_est << endl;
 
+    int workunit_burn_in = workunit_steps;
+    int workunit_samples = 0;
+    if (workunit_burn_in > burn_in) {
+        workunit_burn_in = burn_in;
+        workunit_samples = (workunit_steps - workunit_burn_in);
+    }
+
     ostringstream command_line;
     command_line << " --max_sites " << maxSites
-                 << " --blocks 0.1 0.3 0.3 0.3"
+                 << " --blocks  0.1 0.225 0.225 0.225 0.225"
                  << " --motifs " + motif_string.str()
                  << " --enable_shifting 2 5"
                  << " --print_best_sites 0.1"
-                 << " --print_current_sites"
-                 << " --print_accumulated_samples"
+//                 << " --print_current_sites"
+//                 << " --print_accumulated_samples"
+                 << " --checkpoint_frequency 1000"
                  << " --sequence_file sequences.txt"
-                 << " --sample_period " << workunit_samples
-                 << " --burn_in_period " << workunit_burn_in;
+                 << " --burn_in_period " << workunit_burn_in
+                 << " --sample_period " << workunit_samples;
 
 
     //insert the new gibbs sampler into the database
@@ -280,9 +287,7 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
             << ", number_walks = " << number_walks
             << ", burn_in = " << burn_in
             << ", samples = " << samples
-            << ", current_samples = " << 0
-            << ", workunit_burn_in = " << workunit_burn_in
-            << ", workunit_samples = " << workunit_samples
+            << ", workunit_steps = " << workunit_steps
             << ", command_line_options = '" << command_line.str().c_str() << "'"
             << ", rsc_fpops_est = " << rsc_fpops_est
             << ", rsc_fpops_bound = " << rsc_fpops_bound

@@ -72,11 +72,11 @@ add_executable(dna_validator
         dna_validation_policy)
 target_link_libraries(dna_validator ${UNDVC_COMMON_LIBRARY} ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES})
 
-#add_executable(dna_assimilator
-#   ${BOINC_INCLUDE_DIR}/sched/assimilator
-#   ${BOINC_INCLUDE_DIR}/sched/validate_util
-#   dna_assimilation_policy)
-#target_link_libraries(dna_assimilator ${UNDVC_COMMON_LIBRARY} ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(dna_assimilator
+   ${BOINC_INCLUDE_DIR}/sched/assimilator
+   ${BOINC_INCLUDE_DIR}/sched/validate_util
+   dna_assimilation_policy)
+target_link_libraries(dna_assimilator ${UNDVC_COMMON_LIBRARY} ${BOINC_SERVER_LIBRARIES} ${MYSQL_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(dna_work_generator dna_work_generator)
 target_link_libraries(dna_work_generator ${UNDVC_COMMON_LIBRARY}
