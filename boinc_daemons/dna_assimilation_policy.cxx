@@ -290,10 +290,10 @@ int assimilate_handler(WORKUNIT& wu, vector<RESULT>& results, RESULT& canonical_
 
     //if there is a samples file, copy it to the data directory
     //file might not exist if there weren't any samples
-    if (files.size() == 1 && file_exists(files.at(0).path)) {
+    if (files.size() == 2 && file_exists(files.at(1).path)) {
         //get the canonical samples file
         //delete all other samples files
-        string current_samples_filename = files.at(0).path;
+        string current_samples_filename = files.at(1).path;
 
         //copy the samples file to the data directory
         ostringstream saved_samples_filename;
@@ -319,22 +319,22 @@ int assimilate_handler(WORKUNIT& wu, vector<RESULT>& results, RESULT& canonical_
 
 //    cout << "CANONICAL RESULT STDERR OUT: " << endl << canonical_result.stderr_out << endl;
 
-    string current_sites;            //read the current sites from the canonical result
-    try {
-        current_sites = parse_xml<string>(canonical_result.stderr_out, "current_sites");
-    } catch (string error_message) {
-        log_messages.printf(MSG_CRITICAL, "dna_assimilator assimilate_handler([RESULT#%d %s]) failed with error: %s\n", canonical_result.id, canonical_result.name, error_message.c_str());
-        log_messages.printf(MSG_CRITICAL, "XML:\n'%s'\n", canonical_result.stderr_out);
-        exit(1);
 
-        return 0;
+
+    string current_sites;            //read the current sites from the canonical result
+    ifstream sites_file(files.at(0).path.c_str());
+
+    string line;
+    while (getline(sites_file, line)) {
+        current_sites.append(line);
     }   
+
+    //need to remove all windows carriage returns from the file
+    current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\r'), current_sites.end());
 
     //the walk hasn't finished, copy the current sites to the download
     //directory for the next workunit in the chain
 
-    //need to remove all windows carriage returns from the file
-    current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\r'), current_sites.end());
 
     //current sites has a leading newline, get rid of it
     current_sites = current_sites.substr(1, current_sites.size() - 1);

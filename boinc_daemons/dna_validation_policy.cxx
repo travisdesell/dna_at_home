@@ -55,6 +55,26 @@ struct ResultData {
     char *current_samples;
 };
 
+char* read_file(OUTPUT_FILE_INFO &fi) {
+    ifstream samples_file(fi.path.c_str());
+
+    string file_contents, line;
+    while (getline(samples_file, line)) {
+        file_contents.append(line);
+    }
+
+    file_contents.erase(std::remove(file_contents.begin(), file_contents.end(), '\r'), file_contents.end());
+    file_contents.erase(std::remove(file_contents.begin(), file_contents.end(), '\n'), file_contents.end());
+
+    char* contents = new char[file_contents.size() + 1];
+
+    //sprintf appends the null character
+    strcpy(contents, file_contents.c_str());
+    contents[file_contents.size()] = '\0';
+
+    return contents;
+}
+
 int init_result(RESULT& result, void*& data) {
     ResultData *rd = new ResultData[1];
 
@@ -67,75 +87,39 @@ int init_result(RESULT& result, void*& data) {
         return retval;
     }   
 
-    if (files.size() > 1) {
-        //some error, there should only be one file.
+    if (files.size() > 2) {
+        //some error, there should be only one or two files.
         log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: too many output filenames\n", result.id, result.name);  
+        result.outcome = RESULT_OUTCOME_VALIDATE_ERROR;
+        result.validate_state = VALIDATE_STATE_INVALID;
         exit(1);
         return 1;
+
+    } else if (files.size() == 2) {
+        rd->current_sites = read_file(files[0]);
+//        cout << "sites: " << rd->current_sites << endl << endl;
+        rd->current_samples = read_file(files[1]);
+//        cout << "samples: " << rd->current_samples << endl << endl;
 
     } else if (files.size() == 1) {
         //theres one file, it will be the samples
         log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: need to read samples from output file\n", result.id, result.name);  
 
-        OUTPUT_FILE_INFO& fi = files[0];
-        ifstream samples_file(fi.path.c_str());
+        rd->current_sites = read_file(files[0]);
+//        cout << "sites: " << rd->current_sites << endl << endl;
+//        cout << "samples: NULL" << endl << endl;
 
-        string current_samples, line;
-        while (getline(samples_file, line)) {
-            current_samples.append(line);
-        }
+        rd->current_samples = NULL;
 
-        current_samples.erase(std::remove(current_samples.begin(), current_samples.end(), '\r'), current_samples.end());
-        current_samples.erase(std::remove(current_samples.begin(), current_samples.end(), '\n'), current_samples.end());
-
-        rd->current_samples = new char[current_samples.size() + 1];
-
-        //sprintf appends the null character
-        strcpy(rd->current_samples, current_samples.c_str());
-
-        rd->current_samples[current_samples.size()] = '\0';
+        exit(1);
 
     } else {
         //no files, samples aren't being recorded yet
-        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: samples aren't recorded yet\n", result.id, result.name);  
-
-        rd->current_samples = (char*)malloc(sizeof(char) * 1);
-        rd->current_samples[0] = '\0';
-    }
-
-    try {
-        //need to get current_sites from XML
-        //need to get current_samples from file (if exists) -- maybe get it from XML as well?
-
-        //need to copy stderr_out into a string otherwise we get
-        //segmentation faults for reusing that data
-        string stderr_out(result.stderr_out);
-
-        string current_sites = parse_xml<string>(stderr_out, "current_sites");
-
-        //remove the \r from windows results
-        //you need include <algorithm> to use general algorithms like std::remove()
-        current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\r'), current_sites.end());
-        current_sites.erase(std::remove(current_sites.begin(), current_sites.end(), '\n'), current_sites.end());
-
-        rd->current_sites = new char[current_sites.size() + 1];
-
-        //sprintf appends the null character
-        strcpy(rd->current_sites, current_sites.c_str());
-
-        rd->current_sites[current_sites.size()] = '\0';
-
-    } catch (string error_message) {
-        log_messages.printf(MSG_CRITICAL, "dna_validation_policy get_data_from_result([RESULT#%d %s]) failed with error: %s\n", result.id, result.name, error_message.c_str());
-        log_messages.printf(MSG_CRITICAL, "XML:\n%s\n", result.stderr_out);
+        log_messages.printf(MSG_CRITICAL, "[RESULT#%u %s] check_set: not enough output filenames\n", result.id, result.name);  
         result.outcome = RESULT_OUTCOME_VALIDATE_ERROR;
         result.validate_state = VALIDATE_STATE_INVALID;
-
-        rd->current_sites = new char[1];
-        rd->current_sites[0] = '\0';
-        data = (void*)rd;
-
-        return ERR_XML_PARSE;
+        exit(1);
+        return 1;
     }
 
     data = (void*)rd;
@@ -162,12 +146,14 @@ int compare_results(
         } else {
             log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n%s\nvs\n%s\n", rd1->current_samples, rd2->current_samples);
             match = false;
+//           exit(1);
             return 0;
         }
 
     } else {
         log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n%s\nvs\n%s\n", rd1->current_sites, rd2->current_sites);
         match = false;
+//        exit(1);
         return 0;
     }
 
@@ -177,8 +163,8 @@ int compare_results(
 int cleanup_result(RESULT const& /*result*/, void* data) {
     ResultData* rd = (ResultData*)data;
 
-    delete[] rd->current_samples;
-    delete[] rd->current_sites;
+    if (rd->current_samples != NULL) delete[] rd->current_samples;
+    if (rd->current_sites != NULL) delete[] rd->current_sites;
     delete rd;
 
     return 0;

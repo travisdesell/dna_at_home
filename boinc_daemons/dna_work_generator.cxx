@@ -225,7 +225,7 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
 
     int workunit_steps   = 10000;
     int burn_in          = 0;                   //burn in for the full walk
-    int samples          = 100000;             //samples to be taken for the full walk
+    int samples          = 500000;             //samples to be taken for the full walk
 
     //check to see if the server is stopped
     check_stop_daemons();
@@ -269,7 +269,7 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
                  << " --motifs " + motif_string.str()
                  << " --enable_shifting 2 5"
                  << " --print_best_sites 0.1"
-                 << " --print_current_sites"
+//                 << " --print_current_sites"
 //                 << " --print_accumulated_samples"
                  << " --checkpoint_frequency 1000"
                  << " --sequence_file sequences.txt"

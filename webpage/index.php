@@ -9,7 +9,7 @@ require_once($cwd[__FILE__] . "/../../citizen_science_grid/navbar.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/news.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/footer.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/my_query.php");
-require_once($cwd[__FILE__] . "/../../citizen_science_grid/uotd.php");
+require_once($cwd[__FILE__] . "/../../citizen_science_grid/csg_uotd.php");
 
 print_header("DNA@Home", "", "dna");
 print_navbar("Projects: DNA@Home", "DNA@Home");
@@ -62,7 +62,7 @@ echo "
             <div class='col-sm-6'>";
 
 show_uotd(2, 10, "style='margin-top:20px;'");
-show_news();
+csg_show_news();
 
 echo "
             </div> <!-- col-sm-6 -->
