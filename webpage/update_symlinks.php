@@ -42,6 +42,10 @@ $command = "ln -s $cwd/css $target/css";
 shell_exec("rm $target/css");
 shell_exec($command);
 
+$command = "ln -s $cwd/dna_badges $target/dna_badges";
+shell_exec("rm $target/dna_badges");
+shell_exec($command);
+
 $command = "ln -s $cwd/images $target/images";
 shell_exec("rm $target/images");
 shell_exec($command);

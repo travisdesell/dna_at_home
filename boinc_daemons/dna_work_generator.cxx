@@ -108,15 +108,21 @@ void __mysql_check(MYSQL *conn, string query, const char *file, const int line) 
     }
 }
 
-int get_number_nucleotides(string sequence_filename) {
+int get_sequence_data(string sequence_filename, int &number_nucleotides, int &number_sequences) {
     ifstream sequence_file(sequence_filename.c_str());
 
-    int number_nucleotides = 0;
+    number_nucleotides = 0;
+    number_sequences = 0;
     int line_number = 0;
+
     string line;
     while (getline(sequence_file, line)) {
         if (line.size() == 0) continue;
-        if (line[0] == '>') continue;
+        if (line[0] == '>') {
+            number_sequences++;
+            continue;
+        }
+
         if (line.find_first_not_of(' ') == string::npos) continue;
         if (line.find_first_not_of("ACGTacgt") != string::npos) {
             cerr << "ERROR: malformed sequence file: '" << sequence_filename << "'" << endl;
@@ -230,7 +236,9 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     //check to see if the server is stopped
     check_stop_daemons();
 
-    int numberNucleotides = get_number_nucleotides(sequences_filename);
+    int numberNucleotides;
+    int numberSequences;
+    get_sequence_data(sequences_filename, numberNucleotides, numberSequences);
 
     int numberMotifs = 4;
     int modelWidth = 6;
@@ -250,8 +258,8 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
 
     rsc_fpops_est *= 10.0;
     double rsc_fpops_bound = rsc_fpops_est * 100.0;
-    double rsc_memory_bound = 5e7;
-    double rsc_disk_bound = 50 * 1024 * 1024; //50MB
+    double rsc_memory_bound = 5e8;
+    double rsc_disk_bound = 100 * 1024 * 1024; //100MB
     double delay_bound = 86400;
 
     cerr << "NEW RSC_FPOPS_EST = " << rsc_fpops_est << endl;
@@ -263,6 +271,8 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
         workunit_samples = (workunit_steps - workunit_burn_in);
     }
 
+    int checkpoint_frequency = 1000000 / numberSequences; 
+
     ostringstream command_line;
     command_line << " --max_sites " << maxSites
                  << " --blocks  0.1 0.225 0.225 0.225 0.225"
@@ -271,7 +281,8 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
                  << " --print_best_sites 0.1"
 //                 << " --print_current_sites"
 //                 << " --print_accumulated_samples"
-                 << " --checkpoint_frequency 1000"
+//                 << " --checkpoint_frequency 1000"
+                 << " --checkpoint_frequency " << checkpoint_frequency
                  << " --sequence_file sequences.txt"
                  << " --burn_in_period " << workunit_burn_in
                  << " --sample_period " << workunit_samples;
