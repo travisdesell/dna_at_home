@@ -206,6 +206,7 @@ int main(int argc, char** argv) {
         sites_from_arguments = 1;
         cerr << "Reading sites file: " << sites_file << endl;
         read_sites(sites_file, sequences);
+//        write_sites_to_file(cerr, ".\n", sequences);
     }
 
     vector<MotifModel> motif_models;
@@ -223,7 +224,7 @@ int main(int argc, char** argv) {
             starting_from_checkpoint = 1;
             if (iteration >= burn_in_period) {
                 read_accumulated_samples(string(SAMPLES_CHECKPOINT_FILE), sequences);
-                write_accumulated_samples_to_file(cerr, sequences);
+//                write_accumulated_samples_to_file(cerr, sequences);
             }
         }
     }

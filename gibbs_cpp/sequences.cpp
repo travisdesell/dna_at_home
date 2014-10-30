@@ -57,7 +57,7 @@ Sequence::Sequence(string sequence_information, string _nucleotides, int max_sit
     background_site_probability = vector< vector<long double> >(number_motifs, vector<long double>(nucleotides.size(), (long double)0.0));
     site_probability_ratio = vector< vector<long double> >(number_motifs, vector<long double>(nucleotides.size(), (long double)0.0));
 
-    cerr << "created sequence '" << sequence_information << " with max sites = '" << max_sites << "' and nucleotides.size() = '" << nucleotides.size() << "'" << endl;
+//    cerr << "created sequence '" << sequence_information << " with max sites = '" << max_sites << "' and nucleotides.size() = '" << nucleotides.size() << "'" << endl;
 
     site_probability = vector< vector<long double> >(max_sites, vector<long double>(nucleotides.size(), (long double)0.0));
     motif_probability_contribution = vector< vector< vector<long double> > >(max_sites, vector< vector<long double> >(nucleotides.size(), vector<long double>(number_motifs, (long double)0.0)));
