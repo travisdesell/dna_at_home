@@ -327,6 +327,7 @@ int assimilate_handler(WORKUNIT& wu, vector<RESULT>& results, RESULT& canonical_
     string line;
     while (getline(sites_file, line)) {
         current_sites.append(line);
+        current_sites.append("\n");
     }   
 
     //need to remove all windows carriage returns from the file
@@ -336,10 +337,15 @@ int assimilate_handler(WORKUNIT& wu, vector<RESULT>& results, RESULT& canonical_
     //directory for the next workunit in the chain
 
 
-    //current sites has a leading newline, get rid of it
-    current_sites = current_sites.substr(1, current_sites.size() - 1);
+    //if current sites has a leading newline, get rid of it
+    if (current_sites[0] == '\n') {
+        current_sites = current_sites.substr(1, current_sites.size() - 2);
+    } else {
+        current_sites = current_sites.substr(0, current_sites.size() - 1);
+    }
 
 //    cout << "current sites: '" << current_sites << "'" << endl;
+//    exit(1);
 
     //update the sites, seed and increment the steps done
     int seed = (int)(drand() * std::numeric_limits<int>::max());

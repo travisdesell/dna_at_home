@@ -258,8 +258,8 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
 
     rsc_fpops_est *= 10.0;
     double rsc_fpops_bound = rsc_fpops_est * 100.0;
-    double rsc_memory_bound = 5e8;
-    double rsc_disk_bound = 100 * 1024 * 1024; //100MB
+    double rsc_memory_bound = 5e9;
+    double rsc_disk_bound = 300 * 1024 * 1024; //300MB
     double delay_bound = 86400;
 
     cerr << "NEW RSC_FPOPS_EST = " << rsc_fpops_est << endl;

@@ -1,0 +1,1 @@
+g++ ../gibbs_cpp/print_sampled_sites.cpp ../gibbs_cpp/checkpoint.cpp ../gibbs_cpp/motif_models.cpp ../gibbs_cpp/sequences.cpp ../gibbs_cpp/sampling.cpp ../gibbs_cpp/phylogeny.cpp ../gibbs_cpp/util.cpp ../../mersenne_twister/dSFMT.c -DDSFMT_MEXP=19937 -lm -o print_sampled_sites
