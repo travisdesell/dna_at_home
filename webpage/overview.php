@@ -9,17 +9,27 @@ require_once($cwd[__FILE__] . "/../../citizen_science_grid/navbar.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/footer.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/my_query.php");
 
-print_header("DNA@Home: Current Search Progress", "", "dna");
+print_header("DNA@Home: Current Search Progress", "<script type='text/javascript' src='./js/overview.js'></script>", "dna");
 print_navbar("Projects: DNA@Home", "DNA@Home", "..");
 
 echo "
     <div class='container'>
+        <div class='row' style='margin-bottom:10px;'>
+            <div class='col-sm-12'>
+                <button type='button' id='display-inactive-runs-button' class='btn btn-primary pull-right'>
+                    Display Inactive Runs
+                </button>
+            </div> <!--col-sm-12 -->
+        </div> <!-- row -->
+
         <div class='row'>
             <div class='col-sm-12'>";
 
-$sampler_result = query_boinc_db("SELECT * FROM gibbs_sampler");
+$sampler_result = query_boinc_db("SELECT * FROM gibbs_sampler ORDER BY name");
 
 while ($sampler_row = $sampler_result->fetch_assoc()) {
+    if ($sampler_row['samples'] == 0) $sampler_row['is_hidden'] = true;
+
     $sampler_rows['row'][] = $sampler_row;
 }
 
@@ -32,6 +42,7 @@ echo $m->render($projects_template, $sampler_rows);
 echo "
             </div> <!-- col-sm-12 -->
         </div> <!-- row -->
+
     </div> <!-- /container -->";
 
 

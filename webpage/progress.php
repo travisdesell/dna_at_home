@@ -11,21 +11,36 @@ require_once($cwd[__FILE__] . "/../../citizen_science_grid/my_query.php");
 
 $sampler_id = mysql_real_escape_string($_GET['id']);
 
-print_header("DNA@Home: Search $sampler_id Progress", "", "dna");
-print_navbar("Projects: DNA@Home", "DNA@Home", "..");
-
-echo "
-    <div class='container'>
-        <div class='row'>
-            <div class='col-sm-12'>";
-
-$sampler_result = query_boinc_db("SELECT samples FROM gibbs_sampler WHERE id = $sampler_id");
+$sampler_result = query_boinc_db("SELECT samples, name FROM gibbs_sampler WHERE id = $sampler_id");
 $sampler_row = $sampler_result->fetch_assoc();
 
 if (!$sampler_row) {
     echo "Gibbs Sampler run with id $sampler_id not in database.\n";
 
+    print_header("DNA@Home: Progress for Unknown Search", "", "dna");
+    print_navbar("Projects: DNA@Home", "DNA@Home", "..");
+    print_footer('Travis Desell and the DNA@Home Team', 'Travis Desell, Archana Dhasarathy, Sergei Nechaev');
+
+
 } else {
+    $sampler_name = $sampler_row['name'];
+
+    print_header("DNA@Home: Progress for $sampler_name", "", "dna");
+    print_navbar("Projects: DNA@Home", "DNA@Home", "..");
+
+    echo "
+        <div class='container'>
+        <div class='row' style='margin-bottom:10px;'>
+            <div class='col-sm-12'>
+                <a type='button' class='btn btn-default pull-left' href='./overview.php'>
+                    Return to Overview
+                </a>
+            </div> <!-- col-sm-12 -->
+        </div> <!-- row -->
+
+        <div class='row'>
+        <div class='col-sm-12'>";
+
     $max_samples = $sampler_row['samples'];
 
     $walk_result = query_boinc_db("SELECT id, current_steps, had_error FROM gibbs_walk WHERE sampler_id = $sampler_id ORDER BY current_steps DESC");
@@ -36,6 +51,7 @@ if (!$sampler_row) {
         $walk_row['progress_percentage'] = ($walk_row['current_steps'] / $max_samples) * 100.0;
 //        echo "progress_percentage: " . $walk_row['progress_percentage'] . "<br>";
 
+        $walk_row['max_samples'] = $max_samples;
         if (!$walk_row['had_error']) unset($walk_row['had_error']);
 
         $walk_rows['row'][] = $walk_row;
@@ -45,16 +61,17 @@ if (!$sampler_row) {
 
     $m = new Mustache_Engine;
     echo $m->render($projects_template, $walk_rows);
-}
 
 
-echo "
-            </div> <!-- col-sm-12 -->
+    echo "
+        </div> <!-- col-sm-12 -->
         </div> <!-- row -->
-    </div> <!-- /container -->";
+        </div> <!-- /container -->";
 
 
-print_footer('Travis Desell and the DNA@Home Team', 'Travis Desell, Archana Dhasarathy, Sergei Nechaev');
+    print_footer('Travis Desell and the DNA@Home Team', 'Travis Desell, Archana Dhasarathy, Sergei Nechaev');
+
+}
 
 echo "</body></html>";
 

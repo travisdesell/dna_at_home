@@ -9,9 +9,9 @@
     </thead>
     <tbody>
         {{#row}}
-            <tr>
+            <tr {{#is_hidden}}class='inactive-search' hidden{{/is_hidden}}>
                 <td>{{id}}</td>
-                <td><a href='./progress.php?id={{id}}'>{{name}}</a></td>
+                <td>{{^is_hidden}}<b>{{/is_hidden}}<a href='./progress.php?id={{id}}'>{{name}}</a>{{^is_hidden}}</b>{{/is_hidden}}</td>
                 <td>{{number_walks}}</td>
                 <td>{{burn_in}}</td>
                 <td>{{samples}}</td>
