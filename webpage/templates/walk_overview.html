@@ -1,0 +1,24 @@
+<div class='row'>
+<div class='col-sm-2'>
+    <th>id</th> <th>current steps / max steps</th>
+</div>
+<div class='col-sm-10'>
+    <th>progress (red for error)</td>
+</div>
+</div>
+
+<div class='row'>
+{{#row}}
+<div class='col-sm-2'>
+    {{id}} - {{current_steps}} 
+</div>
+<div class='col-sm-10'>
+    <div class="progress" style='margin-bottom:3px;'>
+        <div class="progress-bar {{#had_error}}progress-bar-danger{{/had_error}}" role="progressbar" aria-valuenow="{{progress_percentage}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress_percentage}}%;">
+            {{progress_percentage}}%
+        </div>
+    </div>
+</div>
+<br>
+{{/row}}
+</div>

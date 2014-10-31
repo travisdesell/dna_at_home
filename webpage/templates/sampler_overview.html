@@ -1,0 +1,22 @@
+<table class='table table-striped table-bordered'>
+    <thead>
+        <th>id</th>
+        <th>Name</th>
+        <th>Number Walks</th>
+        <th>Burn In</th>
+        <th>Samples/Walk</th>
+        <th>Workunit Steps</th>
+    </thead>
+    <tbody>
+        {{#row}}
+            <tr>
+                <td>{{id}}</td>
+                <td><a href='./progress.php?id={{id}}'>{{name}}</a></td>
+                <td>{{number_walks}}</td>
+                <td>{{burn_in}}</td>
+                <td>{{samples}}</td>
+                <td>{{workunit_steps}}</td>
+            </tr>
+        {{/row}}
+    </tbody>
+</table>
