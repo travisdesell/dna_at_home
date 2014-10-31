@@ -25,7 +25,7 @@ if (!$sampler_row) {
 } else {
     $sampler_name = $sampler_row['name'];
 
-    print_header("DNA@Home: Progress for $sampler_name", "", "dna");
+    print_header("DNA@Home: Progress for $sampler_name", "<script type='text/javascript' src='./js/progress.js'></script>", "dna");
     print_navbar("Projects: DNA@Home", "DNA@Home", "..");
 
     echo "
@@ -35,6 +35,16 @@ if (!$sampler_row) {
                 <a type='button' class='btn btn-default pull-left' href='./overview.php'>
                     Return to Overview
                 </a>
+
+                <button id='toggle-finished-button' type='button' class='btn btn-success pull-right' href='./overview.php'>
+                    Hide Finished
+                </a>
+                <button id='toggle-active-button' type='button' class='btn btn-primary pull-right' href='./overview.php'>
+                    Hide Active
+                </a>
+                <button id='toggle-error-button' type='button' class='btn btn-danger pull-right' href='./overview.php'>
+                    Hide Errors
+                </button>
             </div> <!-- col-sm-12 -->
         </div> <!-- row -->
 
@@ -51,8 +61,12 @@ if (!$sampler_row) {
         $walk_row['progress_percentage'] = ($walk_row['current_steps'] / $max_samples) * 100.0;
 //        echo "progress_percentage: " . $walk_row['progress_percentage'] . "<br>";
 
+        if ($walk_row['progress_percentage'] == 100) $walk_row['finished'] = true;
+        else $walk_row['active'] = true;
+
         $walk_row['max_samples'] = $max_samples;
         if (!$walk_row['had_error']) unset($walk_row['had_error']);
+        else unset($walk_row['active']);
 
         $walk_rows['row'][] = $walk_row;
     }

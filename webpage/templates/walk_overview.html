@@ -8,13 +8,13 @@
 
     <tbody>
         {{#row}}
-        <tr>
+        <tr class="{{#finished}}finished-progress{{/finished}} {{#had_error}}error-progress{{/had_error}} {{#active}}active-progress{{/active}}">
             <td>{{id}}</td>
             <td>{{current_steps}}</td>
             <td>{{max_samples}}</td>
             <td>
                 <div class="progress" style='margin-bottom:3px;'>
-                    <div class="progress-bar {{#had_error}}progress-bar-danger{{/had_error}}" role="progressbar" aria-valuenow="{{progress_percentage}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress_percentage}}%;">
+                    <div class="progress-bar {{#finished}}progress-bar-success{{/finished}} {{#had_error}}progress-bar-danger{{/had_error}}" role="progressbar" aria-valuenow="{{progress_percentage}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress_percentage}}%;">
                         {{progress_percentage}}%
                     </div>
                 </div>
