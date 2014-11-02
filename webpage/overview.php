@@ -30,6 +30,11 @@ $sampler_result = query_boinc_db("SELECT * FROM gibbs_sampler ORDER BY name");
 while ($sampler_row = $sampler_result->fetch_assoc()) {
     if ($sampler_row['samples'] == 0) $sampler_row['is_hidden'] = true;
 
+    $walks_result = query_boinc_db("SELECT AVG(current_steps) FROM gibbs_walk WHERE sampler_id = " . $sampler_row['id']);
+    $walks_row = $walks_result->fetch_assoc();
+
+    $sampler_row['avg_progress'] = $walks_row['AVG(current_steps)'];
+
     $sampler_rows['row'][] = $sampler_row;
 }
 

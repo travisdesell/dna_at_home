@@ -33,7 +33,7 @@ if (!$sampler_row) {
         <div class='row' style='margin-bottom:10px;'>
             <div class='col-sm-12'>
                 <a type='button' class='btn btn-default pull-left' href='./overview.php'>
-                    Return to Overview
+                    <span class='glyphicon glyphicon-chevron-left'></span> Return to Overview
                 </a>
 
                 <button id='toggle-finished-button' type='button' class='btn btn-success pull-right' href='./overview.php'>
