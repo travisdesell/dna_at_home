@@ -94,9 +94,9 @@ def get_files_in_dir(in_dir):
             total_files += 1
             match1 = int(match.group(1))
             match2 = int(match.group(2))
-        if match1 not in file_values:
-            file_values[match1] = []
-        file_values[match1].append(match2)
+            if match1 not in file_values:
+                file_values[match1] = []
+            file_values[match1].append(match2)
     #print file_values
 
     for file_name in file_values:
