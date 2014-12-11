@@ -14,6 +14,7 @@ import json
 
 USAGE = "\n".join([
     "python ks_intrawalk_convergence.py <IN_DIR> <OUT_GRAPH> <OUT_DATA> [plot_data_file_name]",
+    "$ ./ks_convergence_intrawalk.py /home/kzarns/test_hg19_10fa_5 test_graph6 test_data test_data.json > tmp.js",
     "Plots the kolmogorov Smirnov Statistic which compares two distributions",
     "Each step file within a walk represents a new distribution",
     "Over a number of steps those distributions should start to converge",
