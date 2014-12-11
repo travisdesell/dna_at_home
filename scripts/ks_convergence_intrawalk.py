@@ -195,6 +195,8 @@ def plot_data(data, out_graph_file_name):
         plt.ylabel("Probability")
         plt.plot(x2_data, y2_data)
 
+    plt.subplot(211)
+    plt.title(os.path.splitext(os.path.basename(out_graph_file_name))[0])
     plt.savefig(out_graph_file_name)
     #plt.show()
     #print "KS results: %s" % data
