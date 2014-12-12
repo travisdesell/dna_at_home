@@ -240,11 +240,13 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     int numberSequences;
     get_sequence_data(sequences_filename, numberNucleotides, numberSequences);
 
-    int numberMotifs = 4;
+    int numberMotifs = 2;
     int modelWidth = 6;
     ostringstream motif_string;
-    motif_string << "forward," << modelWidth << " reverse," << modelWidth << " forward," << modelWidth << " reverse," << modelWidth << " ";
-    int maxSites = 4;
+    for (int i = 0; i < numberMotifs / 2; i++) {
+        motif_string << " forward," << modelWidth << " reverse," << modelWidth;
+    }
+    int maxSites = 2 * (numberMotifs / 2) + 1;
 
     //Make sure the sequences filename is in the download directory
     copy_file_to_download_dir(sequences_filename);
@@ -274,9 +276,15 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     int checkpoint_frequency = 1000000 / numberSequences; 
 
     ostringstream command_line;
-    command_line << " --max_sites " << maxSites
-                 << " --blocks  0.1 0.225 0.225 0.225 0.225"
-                 << " --motifs " + motif_string.str()
+    command_line << " --max_sites " << maxSites;
+
+    command_line << " --blocks 0.1";
+    for (int i = 0; i < maxSites; i++) {
+        // "0.225 0.225 0.225 0.225"
+        command_line << " " << (0.9 / maxSites);
+    }
+
+    command_line << " --motifs " + motif_string.str()
                  << " --enable_shifting 2 5"
                  << " --print_best_sites 0.1"
 //                 << " --print_current_sites"

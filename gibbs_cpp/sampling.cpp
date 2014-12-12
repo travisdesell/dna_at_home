@@ -268,13 +268,13 @@ void print_sample_and_nearest(Sequence *sequence, MotifModel &motif_model, int e
         if (position < 0) printf(" ");
         else printf("%c", tolower(sequence->nucleotides[position]));
     }
-    printf(" ");
+//    printf(" ");
 
     for (i = 0; i < motif_model.motif_width; i++) {
         printf("%c", sequence->nucleotides[end_position - motif_model.motif_width + 1 + i]);
     }
 
-    printf(" ");
+//    printf(" ");
     for (i = 0; i < nearest; i++) {
         position = end_position + 1 + i;
         if (position >= (int)sequence->nucleotides.size()) printf(" ");
