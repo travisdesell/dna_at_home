@@ -25,28 +25,37 @@ USAGE = "\n".join([
     "  A high probability indicates convergence",
     "",
     "IN_DIR is the directory containing walks of the form walk_#_steps_#",
-    "OUT_GRAPH is the basename of the graph file to output",
-    "OUT_DATA is the basename of the data file to output",
-    "plot_data_file_name is optional and is used to update a plot with new files",
-    "steps that have already been calculated will be loaded"
+#    "OUT_GRAPH is the basename of the graph file to output",
+#    "OUT_DATA is the basename of the data file to output",
+#    "plot_data_file_name is optional and is used to update a plot with new files",
+#    "steps that have already been calculated will be loaded"
 ])
 
 def main():
     """Just so we don't have a global variable mess"""
 
-    if len(sys.argv) < 4:
-        print "missing args? : %s, %s" % (sys.argv, USAGE)
+    in_dir = None
+    out_graph_file_name = None
+    out_data_file_name = None
+    plot_data_file_name = None
+    if len(sys.argv) != 1:
+        print "bad dir? : %s, %s" % (sys.argv, USAGE)
         sys.exit(1)
 
     in_dir = sys.argv[1]
     print "in_dir: %s" % in_dir
-    out_graph_file_name = sys.argv[2] + ".png"
+
+    (head, tail) = os.path.split(in_dir)
+    if tail == "":
+        (head, tail) = os.path.split(in_dir)
+
+    out_graph_file_name = "%s/%s.png" % (head, tail)
     print "out_graph_file_name: %s" % out_graph_file_name
-    out_data_file_name = sys.argv[3] + ".json"
+    out_data_file_name = "%s/%s/%s.json" % (head, tail, tail)
     print "out_data_file_name: %s" % out_data_file_name
-    plot_data_file_name = None
-    if len(sys.argv) == 5:
-        plot_data_file_name = sys.argv[4]
+
+    if os.path.exists(out_data_file_name):
+        plot_data_file_name = out_data_file_name
         print "plot_data_file_name: %s" % plot_data_file_name
 
     (file_values, total_files) = get_files_in_dir(in_dir)
