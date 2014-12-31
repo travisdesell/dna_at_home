@@ -38,7 +38,7 @@ def main():
     out_graph_file_name = None
     out_data_file_name = None
     plot_data_file_name = None
-    if len(sys.argv) != 1:
+    if len(sys.argv) != 2:
         print "bad dir? : %s, %s" % (sys.argv, USAGE)
         sys.exit(1)
 
