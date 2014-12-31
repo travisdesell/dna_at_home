@@ -47,7 +47,7 @@ def main():
 
     (head, tail) = os.path.split(in_dir)
     if tail == "":
-        (head, tail) = os.path.split(in_dir)
+        (head, tail) = os.path.split(head)
 
     out_graph_file_name = "%s/%s.png" % (head, tail)
     print "out_graph_file_name: %s" % out_graph_file_name
