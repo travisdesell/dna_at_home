@@ -10,8 +10,8 @@ usage = ""
 parser = OptionParser(usage)
 parser.add_option("--step", dest="step", help="Which step should be compared?", metavar="INT")
 parser.add_option("--sample_name", dest="sample_name", help="What sample should be used?", metavar="STRING")
-parser.add_option("--passwd", dest="database password", help="What passwd to use", metavar="STRING")
-parser.add_option("--best_pct", dest="Best Percentage Override", help="Whatis the minimum represnetation required", metavar="STRING")
+parser.add_option("--passwd", dest="passwd", help="What passwd to use", metavar="STRING")
+parser.add_option("--best_pct", dest="best_pct", help="Whatis the minimum represnetation required", metavar="STRING")
 
 (options, args) = parser.parse_args()
 if not options.step or not options.sample_name:
@@ -56,9 +56,9 @@ sample_period_r = re.compile("--sample_period (\d+)")
 #WALK: {'current_steps': 500000L, 'command_line_options': ' --max_sites 4 --blocks  0.1 0.225 0.225 0.225 0.225 --motifs forward,6 reverse,6 forward,6 reverse,6  --enable_shifting 2 5 --print_best_sites 0.1 --checkpoint_frequency 1006 --sequence_file sequences.txt --burn_in_period 0 --sample_period 10000', 'name': 'snail_hg19_1000fa_1', 'id': 180511L}
 
 for walk in result:
-	print "WALK: %s\n" % walk
+#	print "WALK: %s\n" % walk
 
-	print "WALK_CMD: %s\n" % walk["command_line_options"]
+#	print "WALK_CMD: %s\n" % walk["command_line_options"]
 	motifs = motif_r.search(walk["command_line_options"]).group(0)
 	#print "motifs: '%s'" % motifs
 	max_sites = max_sites_r.search(walk["command_line_options"]).group(0)
@@ -83,13 +83,13 @@ for walk in result:
 	#XXX fix the hardcoded path
 	#args = " ".join(("/home/tdesell/dna_at_home/bin/print_sampled_sites", max_sites, motifs, shift, best, samples_period, sequence, "--samples_file %s" % samples_file, ">","%s_motifs/%s.motifs" % (head, tail)))
 	args = " ".join(("/home/tdesell/dna_at_home/bin/print_sampled_sites", max_sites, motifs, shift, best, samples_period, sequence, "--samples_file %s" % samples_file))
-	print "args: %s\n" % args
-	print "real: /home/tdesell/dna_at_home/bin/print_sampled_sites --max_sites 4 --motifs forward,6 reverse,6 forward,6 reverse,6 --enable_shifting 2 5 --best_site_percentage 0.1 --samples_period 10000 --sequence_file /data/dna_at_home/snail/wgEncodeOpenChromChipMcf7Pol2SerumstimRawDataRep1_deduplicated_snail_1000.fa --samples_file /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000 > /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000.motifs\n"
+#	print "args: %s\n" % args
+#	print "real: /home/tdesell/dna_at_home/bin/print_sampled_sites --max_sites 4 --motifs forward,6 reverse,6 forward,6 reverse,6 --enable_shifting 2 5 --best_site_percentage 0.1 --samples_period 10000 --sequence_file /data/dna_at_home/snail/wgEncodeOpenChromChipMcf7Pol2SerumstimRawDataRep1_deduplicated_snail_1000.fa --samples_file /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000 > /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000.motifs\n"
 	new_args = shlex.split(args)
-	print "new : %s\n" % new_args
-	with open("%s.motifs" % samples_file, "w") as out_file: 
-		subprocess.Popen(new_args, stdout=out_file)
-
+#	print "new : %s\n" % new_args
+	with open("%s.motifs" % samples_file, "w+") as out_file: 
+		subprocess.call(new_args, stdout=out_file)
+		
 
 #	steps = 
 	
