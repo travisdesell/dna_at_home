@@ -84,8 +84,7 @@ for walk in result:
 	samples_file = "%s/%s/walk_%s_steps_%s" % (options.data_root, walk["name"], walk["id"], options.step)
 	#print "samples_file: '%s'" % samples_file
 
-	sequence = "--sequence_file %s" % walk["sequences_filename"]
-	sequence = "%s/%s" % (options.seq_root, os.path.basename(sequence))
+	sequence = "--sequence_file %s/%s" % (options.seq_root, os.path.basename( walk["sequences_filename"]))
 
 
 	#XXX fix the hardcoded path
@@ -96,7 +95,7 @@ for walk in result:
 	new_args = shlex.split(args)
 #	print "new : %s\n" % new_args
 	if options.no_exec:
-		print "%s\n" % args
+		print "%s > %s.motifs" % (args, samples_file)
 	else:
 		with open("%s.motifs" % samples_file, "w+") as out_file: 
 			subprocess.call(new_args, stdout=out_file)
