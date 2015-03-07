@@ -4,6 +4,8 @@ import re
 from optparse import OptionParser
 import subprocess
 import shlex
+import os
+
 
 #usage = "usage: %prog [options] arg"
 usage = ""
@@ -12,6 +14,10 @@ parser.add_option("--step", dest="step", help="Which step should be compared?", 
 parser.add_option("--sample_name", dest="sample_name", help="What sample should be used?", metavar="STRING")
 parser.add_option("--passwd", dest="passwd", help="What passwd to use", metavar="STRING")
 parser.add_option("--best_pct", dest="best_pct", help="Whatis the minimum represnetation required", metavar="STRING")
+parser.add_option("--dna_root", dest="dna_root", help="where is the dna_at_home directory?", metavar="STRING")
+parser.add_option("--data_root", dest="data_root", help="where is the data directory?", metavar="STRING")
+parser.add_option("--seq_root", dest="seq_root", help="where is the seq directory?", metavar="STRING")
+parser.add_option("--no_exec", dest="no_exec", help="writeout a shell script", action="store_true", default=False)
 
 (options, args) = parser.parse_args()
 if not options.step or not options.sample_name:
@@ -75,20 +81,25 @@ for walk in result:
 	samples_period = "--samples_period %s" % sample_period_m.group(1)
 	#print "samples_period: '%s'" % samples_period
 	
-	samples_file = "/data/dna_at_home/%s/walk_%s_steps_%s" % (walk["name"], walk["id"], options.step)
+	samples_file = "%s/%s/walk_%s_steps_%s" % (options.data_root, walk["name"], walk["id"], options.step)
 	#print "samples_file: '%s'" % samples_file
 
 	sequence = "--sequence_file %s" % walk["sequences_filename"]
+	sequence = "%s/%s" % (options.seq_root, os.path.basename(sequence))
+
 
 	#XXX fix the hardcoded path
 	#args = " ".join(("/home/tdesell/dna_at_home/bin/print_sampled_sites", max_sites, motifs, shift, best, samples_period, sequence, "--samples_file %s" % samples_file, ">","%s_motifs/%s.motifs" % (head, tail)))
-	args = " ".join(("/home/tdesell/dna_at_home/bin/print_sampled_sites", max_sites, motifs, shift, best, samples_period, sequence, "--samples_file %s" % samples_file))
+	args = " ".join(("%s/bin/print_sampled_sites" % options.dna_root, max_sites, motifs, shift, best, samples_period, sequence, "--samples_file %s" % samples_file))
 #	print "args: %s\n" % args
 #	print "real: /home/tdesell/dna_at_home/bin/print_sampled_sites --max_sites 4 --motifs forward,6 reverse,6 forward,6 reverse,6 --enable_shifting 2 5 --best_site_percentage 0.1 --samples_period 10000 --sequence_file /data/dna_at_home/snail/wgEncodeOpenChromChipMcf7Pol2SerumstimRawDataRep1_deduplicated_snail_1000.fa --samples_file /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000 > /data/dna_at_home/snail_hg19_1000fa_1/walk_181178_steps_250000.motifs\n"
 	new_args = shlex.split(args)
 #	print "new : %s\n" % new_args
-	with open("%s.motifs" % samples_file, "w+") as out_file: 
-		subprocess.call(new_args, stdout=out_file)
+	if options.no_exec:
+		print "%s\n" % args
+	else:
+		with open("%s.motifs" % samples_file, "w+") as out_file: 
+			subprocess.call(new_args, stdout=out_file)
 		
 
 #	steps = 
