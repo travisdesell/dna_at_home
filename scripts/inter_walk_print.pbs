@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo $0
+USAGE="USAGE: qsub inter_walk_print.pbs -v ARGS=\"...\""
+
+
+if [ ! -z "${PBS_O_WORKDIR+xxx}" ]; then
+	cd $PBS_O_WORKDIR
+fi
+
+if [ -z "${ARGS+xxx}" ]; then
+	echo "NO ARGS SPECIFIED!"
+	exit 1
+fi
+
+echo "build command"
+CMD="/home/kristopher.zarns/dna_at_home/scripts/inter_walk_print.py $ARGS"
+echo "CMD: $CMD"
+
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=4:00:00
+#PBS -l pmem=4gb
+#PBS -j oe
+echo " "
+echo " "
+echo "Job started on `hostname` at `date`"
+${CMD}
+echo " "
+echo "Job Ended at `date`"
+echo " #"
+
