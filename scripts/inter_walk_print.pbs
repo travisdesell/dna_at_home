@@ -18,7 +18,7 @@ CMD="/home/kristopher.zarns/dna_at_home/scripts/inter_walk_print.py $ARGS"
 echo "CMD: $CMD"
 
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=4:00:00
+#PBS -l walltime=0:20:00
 #PBS -l pmem=4gb
 #PBS -j oe
 echo " "

@@ -5,7 +5,7 @@ import json
 import re
 from optparse import OptionParser
 import os
-
+import math
 
 #no match?     0, 0     988 atgtt CCTCCT tttcc     993 0.2110 > 'PEF1 chr1 32109718 32110718'
 HEADER_R = re.compile("^[FR]|$")
@@ -137,62 +137,64 @@ def process_line(motif_stats, line):
                 return
 
             pct = float(pct) * 100
+
             if gene_id not in motif_stats["by_gene"]:
                 motif_stats["by_gene"][gene_id] = {}
 
-            if motif not in motif_stats["by_gene"][gene_id]:
+            if super_motif not in motif_stats["by_gene"][gene_id]:
                 motif_stats["by_gene"][gene_id][super_motif] = {
-                    "sequence" : seq_num,
                     "total_pct" : 0.0,
                     "count" : 0.0,
                     "max_pct" : 0.0,
                     "min_pct" : 100.0,
-                    "sos_pct" : 0.0,
-                    "max_start" : None,
-                    "eboxc" : leboxc,
-                    "eboxg" : leboxg
+                    "cacctg" : leboxc,
+                    "caggtg" : leboxg,
+                    "start" : start,
+                    "sos_pct" : 0.0
                 }
-
+#
             lmod = motif_stats["by_gene"][gene_id][super_motif]
             lmod["total_pct"] = lmod["total_pct"] + pct
             lmod["count"] = lmod["count"] + 1
-
+#
             if pct > lmod["max_pct"]:
                 lmod["max_pct"] = pct
-                lmod["max_start"] = start
-
+#                lmod["max_start"] = start
+#
             if pct < lmod["min_pct"]:
                 lmod["min_pct"] = pct
-
+#
             lmod["sos_pct"] = lmod["sos_pct"] + pct * pct
-
-            if super_motif not in motif_stats["global"]:
-                motif_stats["global"][super_motif] = {
-                    "total_pct" : 0.0,
-                    "count" : 0,
-                    "max_pct" : 0.0,
-                    "min_pct" : 100.0,
-                    "sos_pct" : 0.0,
-                    "max_gene_id" : None,
-                    "max_gene_start" : None,
-                    "eboxc" : leboxc,
-                    "eboxg" : leboxg
-                }
-
-            gmod = motif_stats["global"][super_motif]
-            gmod["total_pct"] = gmod["total_pct"] + pct
-            gmod["count"] = gmod["count"] + 1
-
-            if pct > gmod["max_pct"]:
-                gmod["max_pct"] = pct
-                gmod["max_gene_id"] = gene_id
-                gmod["max_start"] = start
-
-            if pct < gmod["min_pct"]:
-                gmod["min_pct"] = pct
-
-            gmod["sos_pct"] = gmod["sos_pct"] + pct * pct
-
+#
+#            if super_motif not in motif_stats["global"]:
+#                motif_stats["global"][super_motif] = {
+#                    "total_pct" : 0.0,
+#                    "count" : 0,
+#                    "max_pct" : 0.0,
+#                    "min_pct" : 100.0,
+##                    "sos_pct" : 0.0,
+#                    "eboxc" : leboxc,
+#                    "eboxg" : leboxg,
+#                    "genes" : {}
+#                }
+#
+#
+#            gmod = motif_stats["global"][super_motif]
+#            gmod["total_pct"] = gmod["total_pct"] + pct
+#            gmod["count"] = gmod["count"] + 1
+#
+#            if pct > gmod["max_pct"]:
+#                gmod["max_pct"] = pct
+# #               gmod["max_gene_id"] = gene_id
+# #               gmod["max_start"] = start
+#
+#            if pct < gmod["min_pct"]:
+#                gmod["min_pct"] = pct
+#
+#            if gene_id not in gmod["genes"]:
+#                gmod["genes"][gene_id] = line
+##            gmod["sos_pct"] = gmod["sos_pct"] + pct * pct
+#
         else:
             print "no match? %s" % line
 
@@ -203,39 +205,39 @@ def completion(motif_stats):
 
             lmotif = motif_stats["by_gene"][gene_id][super_motif]
             lmotif["avg_pct_best"] = lmotif["total_pct"] / lmotif["count"]
-            lmotif["avg_pct"] = lmotif["total_pct"] / motif_stats["sample_count"]
-            lmotif["std_dev_best"] = (lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]) / lmotif["count"]
-            lmotif["std_dev"] = (
-                (lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"])
-                / (motif_stats["sample_count"] * motif_stats["motif_num"])
-            )
+#            lmotif["avg_pct"] = lmotif["total_pct"] / motif_stats["sample_count"]
+            lmotif["std_dev_best"] = math.sqrt((lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"] / lmotif["count"])/lmotif["count"])
+#            lmotif["std_dev"] = ((
+#                lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]
+#                / (motif_stats["sample_count"] * motif_stats["motif_num"])
+#            )/(motif_stats["sample_count"] * motif_stats["motif_num"]))
 
-            lmotif["eboxc"] = False
-            lmotif["eboxg"] = False
-            if EBOXC_R.match(super_motif):
-                lmotif["eboxc"] = True
+#            lmotif["eboxc"] = False
+#            lmotif["eboxg"] = False
+#            if EBOXC_R.match(super_motif):
+#                lmotif["eboxc"] = True
 
-            if EBOXG_R.match(super_motif):
-                lmotif["eboxg"] = True
+#            if EBOXG_R.match(super_motif):
+#                lmotif["eboxg"] = True
 
-    for super_motif in motif_stats["global"]:
-
-        gmotif = motif_stats["global"][super_motif]
-        gmotif["avg_pct_best"] = gmotif["total_pct"] / gmotif["count"]
-        gmotif["avg_pct"] = gmotif["total_pct"] / motif_stats["sample_count"]
-        gmotif["std_dev_best"] = (gmotif["sos_pct"] - gmotif["total_pct"] * gmotif["total_pct"]) / gmotif["count"]
-        gmotif["std_dev"] = (
-            (gmotif["sos_pct"] - gmotif["total_pct"] * gmotif["total_pct"])
-            / (motif_stats["sample_count"] * motif_stats["motif_num"])
-        )
-        gmotif["eboxc"] = False
-        gmotif["eboxg"] = False
-        if EBOXC_R.match(super_motif):
-            gmotif["eboxc"] = True
-
-        if EBOXG_R.match(super_motif):
-            gmotif["eboxg"] = True
-
+#    for super_motif in motif_stats["global"]:
+#
+#        gmotif = motif_stats["global"][super_motif]
+#        gmotif["avg_pct_best"] = gmotif["total_pct"] / gmotif["count"]
+#        gmotif["avg_pct"] = gmotif["total_pct"] / motif_stats["sample_count"]
+#        gmotif["std_dev_best"] = (gmotif["sos_pct"] - gmotif["total_pct"] * gmotif["total_pct"]) / gmotif["count"]
+#        gmotif["std_dev"] = (
+#            (gmotif["sos_pct"] - gmotif["total_pct"] * gmotif["total_pct"])
+#            / (motif_stats["sample_count"] * motif_stats["motif_num"])
+#        )
+#        gmotif["eboxc"] = False
+#        gmotif["eboxg"] = False
+#        if EBOXC_R.match(super_motif):
+#            gmotif["eboxc"] = True
+#
+#        if EBOXG_R.match(super_motif):
+#            gmotif["eboxg"] = True
+#
 
 if __name__ == "__main__":
     main()
