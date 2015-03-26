@@ -73,7 +73,7 @@ void Sequence::sample_uniform_random_helper(int number_sites, int position, vect
         cerr << "In file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
         cerr << "Sequence [" << nucleotides << "]" << endl;
         cerr << "position [" << position << "], number sites [" << number_sites << "]" << endl;
-        exit(0);
+        exit(1);
     }
 }
 
@@ -212,7 +212,7 @@ void Sequence::resample_from_models_helper(int number_sites, int position, vecto
         }
 
         cerr << "position [" << position << "], number sites [" << number_sites << "]" << endl;
-        exit(0);
+        exit(1);
     }
 }
 

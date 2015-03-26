@@ -17,7 +17,7 @@ bool get_argument_vector(vector<string> arguments, string argument, bool require
                 T result;
                 if ( !(stringstream(arguments.at(i++)) >> result) ) {
                     cerr << "ERROR: invalid argument '" << argument << "': " << arguments.at(i) << endl;
-                    exit(0);
+                    exit(1);
                 }
                 results.push_back(result);
             }
@@ -28,7 +28,7 @@ bool get_argument_vector(vector<string> arguments, string argument, bool require
 
     if (required && !found) {
         cerr << "ERROR: argument '" << argument << "' required and not found." << endl;
-        exit(0);
+        exit(1);
     }
 
     if (found) {
@@ -57,7 +57,7 @@ bool get_argument_vector<string>(vector<string> arguments, string argument, bool
 
     if (required && !found) {
         cerr << "ERROR: argument '" << argument << "' required and not found." << endl;
-        exit(0);
+        exit(1);
     }
 
     if (found) {
@@ -78,7 +78,7 @@ bool get_argument(vector<string> arguments, string argument, bool required, T &r
         if (argument.compare(arguments.at(i)) == 0) {
             if ( !(stringstream(arguments.at(++i)) >> result) ) {
                 cerr << "ERROR: invalid argument '" << argument << "': " << arguments.at(i) << endl;
-                exit(0);
+                exit(1);
             }
             found = true;
             break;
@@ -87,7 +87,7 @@ bool get_argument(vector<string> arguments, string argument, bool required, T &r
 
     if (required && !found) {
         cerr << "ERROR: argument '" << argument << "' required and not found." << endl;
-        exit(0);
+        exit(1);
     }
 
     if (found) {
@@ -109,7 +109,7 @@ bool get_argument<string>(vector<string> arguments, string argument, bool requir
 
     if (required && !found) {
         cerr << "ERROR: argument '" << argument << "' required and not found." << endl;
-        exit(0);
+        exit(1);
     }
 
     if (found) {
@@ -126,11 +126,11 @@ bool get_arguments(vector<string> arguments, string argument, bool required, T1 
         if (argument.compare(arguments.at(i)) == 0) {
             if ( !(stringstream(arguments.at(++i)) >> result1) ) {
                 cerr << "ERROR: invalid argument '" << argument << "': " << arguments.at(i) << endl;
-                exit(0);
+                exit(1);
             }
             if ( !(stringstream(arguments.at(++i)) >> result2) ) {
                 cerr << "ERROR: invalid argument '" << argument << "': " << arguments.at(i) << endl;
-                exit(0);
+                exit(1);
             }
             found = true;
             break;
@@ -139,7 +139,7 @@ bool get_arguments(vector<string> arguments, string argument, bool required, T1 
 
     if (required && !found) {
         cerr << "ERROR: argument '" << argument << "' required and not found." << endl;
-        exit(0);
+        exit(1);
     }
 
     if (found) {

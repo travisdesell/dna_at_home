@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
             for (unsigned int i = 0; i < blocks.size(); i++) cerr << " " << blocks.at(i);
             cerr << endl;
             cerr << "\tmax_sites + 1: " << max_sites + 1 << endl;
-            exit(0);
+            exit(1);
         }
     } else {
         for (int j = 0; j < max_sites + 1; j++) blocks.push_back(1.0 / ((double)max_sites + 1.0));
