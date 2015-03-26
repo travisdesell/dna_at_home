@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 
 #ifdef _BOINC_
     #include "diagnostics.h"

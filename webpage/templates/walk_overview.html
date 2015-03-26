@@ -1,0 +1,25 @@
+<table class='table table-condensed table-bordered'> 
+    <thead>
+        <th style="width:80px;">id</th>
+        <th style="width:120px;">Current Steps</th>
+        <th style="width:100px;">Max Steps</th>
+        <th>Progress</th>
+    </thead>
+
+    <tbody>
+        {{#row}}
+        <tr class="{{#finished}}finished-progress{{/finished}} {{#had_error}}error-progress{{/had_error}} {{#active}}active-progress{{/active}}">
+            <td>{{id}}</td>
+            <td>{{current_steps}}</td>
+            <td>{{max_samples}}</td>
+            <td>
+                <div class="progress" style='margin-bottom:3px;'>
+                    <div class="progress-bar {{#finished}}progress-bar-success{{/finished}} {{#had_error}}progress-bar-danger{{/had_error}}" role="progressbar" aria-valuenow="{{progress_percentage}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress_percentage}}%;">
+                        {{progress_percentage}}%
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {{/row}}
+    </tbody>
+</table>

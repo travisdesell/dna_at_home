@@ -146,14 +146,14 @@ int compare_results(
         } else {
             log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n%s\nvs\n%s\n", rd1->current_samples, rd2->current_samples);
             match = false;
-//           exit(1);
+            //exit(1);
             return 0;
         }
 
     } else {
         log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n%s\nvs\n%s\n", rd1->current_sites, rd2->current_sites);
         match = false;
-//        exit(1);
+        //exit(1);
         return 0;
     }
 
