@@ -69,9 +69,10 @@ def main():
                 in_file.close()
 
 
-    completion(motif_stats)
+    out = completion(motif_stats)
     with open("%s/motif_stats_%s_%s.json" % (options.sample_dir, tail, options.step), "w") as out_file:
-        json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
+        #json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
+        json.dump(out, out_file, indent=4, separators=(',', ': '))
         out_file.close()
 
 #motif_stats plan
@@ -133,8 +134,8 @@ def process_line(motif_stats, line):
             if EBOXG_R.match(super_motif):
                 leboxg = True
 
-#            if not (leboxc or leboxg):
-#                return
+            if not (leboxc or leboxg):
+                return
 
             pct = float(pct) * 100
 
@@ -200,6 +201,7 @@ def process_line(motif_stats, line):
 
 def completion(motif_stats):
     """ finalize statistics"""
+    readable = []
     for gene_id in motif_stats["by_gene"]:
         for super_motif in motif_stats["by_gene"][gene_id]:
 
@@ -207,6 +209,10 @@ def completion(motif_stats):
             lmotif["avg_pct_best"] = lmotif["total_pct"] / lmotif["count"]
 #            lmotif["avg_pct"] = lmotif["total_pct"] / motif_stats["sample_count"]
             lmotif["std_dev_best"] = math.sqrt((lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"] / lmotif["count"])/lmotif["count"])
+            if lmotif["count"] > 100 and lmotif["avg_pct_best"] > 10:
+                readable.append("& ".join((str(lmotif["count"]), str(lmotif["avg_pct_best"]), gene_id, str(lmotif["start"]), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))) )
+    sort_nicely(readable)
+    return readable
 #            lmotif["std_dev"] = ((
 #                lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]
 #                / (motif_stats["sample_count"] * motif_stats["motif_num"])
@@ -238,6 +244,18 @@ def completion(motif_stats):
 #        if EBOXG_R.match(super_motif):
 #            gmotif["eboxg"] = True
 #
+import re
+def tryint(s):
+    try:
+        return int(s)
+    except:
+        return s
+
+def alphanum_key(s):
+    return [tryint(c) for c in re.split('([0-9]+)', s) ]
+
+def sort_nicely(l):
+    l.sort(key=alphanum_key)
 
 if __name__ == "__main__":
     main()
