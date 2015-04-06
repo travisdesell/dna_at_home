@@ -240,8 +240,8 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     int numberSequences;
     get_sequence_data(sequences_filename, numberNucleotides, numberSequences);
 
-    int numberMotifs = 2;
-    int modelWidth = 6;
+    int numberMotifs = 6;
+    int modelWidth = 8;
     ostringstream motif_string;
     for (int i = 0; i < numberMotifs / 2; i++) {
         motif_string << " forward," << modelWidth << " reverse," << modelWidth;
