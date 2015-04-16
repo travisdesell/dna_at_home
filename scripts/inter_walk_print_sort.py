@@ -134,8 +134,8 @@ def process_line(motif_stats, line):
             if EBOXG_R.match(super_motif):
                 leboxg = True
 
-            if not (leboxc or leboxg):
-                return
+#            if not (leboxc or leboxg):
+#                return
 
             pct = float(pct) * 100
 
@@ -211,8 +211,7 @@ def completion(motif_stats):
             lmotif["std_dev_best"] = math.sqrt((lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"] / lmotif["count"])/lmotif["count"])
             if lmotif["count"] > 100 and lmotif["avg_pct_best"] > 10:
                 readable.append("& ".join((str(lmotif["count"]), str(lmotif["avg_pct_best"]), gene_id, str(lmotif["start"]), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))) )
-    sort_nicely(readable)
-    return readable
+    return sort_nicely(readable)
 #            lmotif["std_dev"] = ((
 #                lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]
 #                / (motif_stats["sample_count"] * motif_stats["motif_num"])
