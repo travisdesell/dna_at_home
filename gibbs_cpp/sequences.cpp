@@ -161,7 +161,7 @@ void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int 
                     cerr << "ERROR: reading sequence: " << sequence_information << endl;
                     cerr << "nucleotides: " << nucleotides << endl;
                     cerr << "nucleotide[" << i << "]: " << c << " is not 'A', 'C', 'G', 'T' or 'X'." << endl;
-                    exit(0);
+                    exit(1);
                 }
             }
             sequences->push_back( new Sequence(sequence_information, nucleotides, max_sites, number_motifs, max_shift_distance) );
@@ -175,7 +175,7 @@ void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int 
         sequence_file.close();
     } else {
         cerr << "ERROR: could not read sequence file: " << sequence_filename << endl;
-        exit(0);
+        exit(1);
     }
 }
 
@@ -459,7 +459,7 @@ void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, in
                         cerr << "probability_phylogeny: " << foreground_probability_phylogeny(*current_motif, j, phylogeny_tree) << endl;
                     }
                     current_motif->print(cerr);
-                    exit(0);
+                    exit(1);
                 }
             } else {
                 site_probability_ratio.at(i).at(j) = 0;
@@ -510,7 +510,7 @@ void Sequence::calculate_site_probabilities(vector<MotifModel> &motif_models, in
                         cerr << "j == " << j << ", sequence->site_probability[" << j - 1 << "][" << k - current_motif->motif_width << "]: " << site_probability.at(j-1).at(k-current_motif->motif_width) << ", sequence->site_probability_ratio[" << l << "][" << k << "]: " << site_probability_ratio.at(l).at(k) << endl;
                         cerr << "site_probability_ratio[" << l << "][" << k-1 << "]: " << site_probability_ratio.at(l).at(k-1) << endl;
                     }
-                    exit(0);
+                    exit(1);
                 }
             }
         }

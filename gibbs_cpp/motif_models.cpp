@@ -35,7 +35,7 @@ MotifModel::MotifModel(string motif_info) {
     if ( ! (stringstream(tmp) >> motif_width) ) {
         cerr << "ERROR: parsing motif model argument: '" << motif_info << endl;
         cerr << "\tcould not parse motif width." << endl;
-        exit(0);
+        exit(1);
     }
 
     cerr << "type_string: " << type_string << ", motif_width: " << motif_width << endl;
@@ -51,7 +51,7 @@ MotifModel::MotifModel(string motif_info) {
     } else {
         cerr << "ERROR: parsing motif model argument: '" << motif_info << endl;
         cerr << "\tunknown model type: " << type_string << endl;
-        exit(0);
+        exit(1);
     }
 
     counts = vector< vector<long> >(motif_width, vector<long>(ALPHABET_LENGTH, 0));
@@ -96,7 +96,7 @@ void MotifModel::increment_counts_for_sample(Sequence *sequence, const Sample &s
     if (end_position - motif_width < 0) {
         cerr << "ERROR (increment_counts): trying to read character with position < 0" << endl;
         cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_width, motif_width) << "]" << endl;
-        exit(0);
+        exit(1);
     }
 
     for (position = 0; position < motif_width; position++) {
@@ -153,7 +153,7 @@ void decrement_counts(vector<MotifModel> &motif_models, Sequence *sequence) {
         if (end_position - motif_model->motif_width < 0) {
             cerr << "ERROR (decrement_counts): trying to read character with position < 0" << endl;
             cerr << "subsequence examined [" << sequence->nucleotides.substr(end_position - motif_model->motif_width, motif_model->motif_width) << "]" << endl;
-            exit(0);
+            exit(1);
         }
 
         for (position = 0; position < motif_model->motif_width; position++) {
@@ -187,7 +187,7 @@ void copy_motif_model(const MotifModel &source, MotifModel &destination) {
     if (source.motif_width != destination.motif_width) {
         cerr << "ERROR copying motif model, source->width [" << source.motif_width << "] != destination->width [" << destination.motif_width << "]" << endl;
         cerr << "In file [" << __FILE__ << "], line [" << __LINE__ << "]" << endl;
-        exit(0);
+        exit(1);
     }
 
     for (j = 0; j < source.motif_width; j++) {
@@ -250,7 +250,7 @@ void update_motif_model_reverse_complement(MotifModel &forward_motif_model, Moti
                 fprintf(stderr, "\n");
                 fprintf(stderr, "REVERSEMODEL:\n");
                 reverse_motif_model.print(cerr);
-                exit(0);
+                exit(1);
     }
 
 }
@@ -329,7 +329,7 @@ void MotifModel::update_motif_model() {
         default:
                 cerr << "ERROR: unknown model type in update_motif_model, FILE [" << __FILE__ << "], LINE [" << __LINE__ << "]" << endl;
                 print(cerr);
-                exit(0);
+                exit(1);
     }
 }
 
@@ -388,7 +388,7 @@ string MotifModel::generate_possible_nucleotides() {
                         cerr << "ERROR(" << __FILE__ << "," << __LINE__ << "): could not generate possible nucleotides for motif: " << endl;
                         print(cerr);
                         cerr << endl << "random value to choose nucleotide " << i << " did not select any random nucleotide (chances are the nucleotide probabilities did not sum to 1" << endl;
-                        exit(0);
+                        exit(1);
                     }                  
                 }                  
             } 
@@ -445,7 +445,7 @@ void read_motifs_from_file(string filename, vector<MotifModel> &motif_models) {
                     cerr << "ERROR(" << __FILE__ << ", " << __LINE__ << "): reading motif from file, different widths for nucleotides" << endl;
                     cerr << "  current line: '" << line << "' has " << current << " nucleotides." << endl;
                     cerr << "  previous line had " << previous_width << " nucleotides." << endl;
-                    exit(0);
+                    exit(1);
                 }
             }
             previous_width = current;

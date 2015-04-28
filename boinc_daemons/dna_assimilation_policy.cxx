@@ -351,6 +351,7 @@ int assimilate_handler(WORKUNIT& wu, vector<RESULT>& results, RESULT& canonical_
     int seed = (int)(drand() * std::numeric_limits<int>::max());
     walk->seed = seed;
     walk->current_steps += sampler->workunit_steps;
+    walk->seed = seed;
 
     //update the walk in the database
     ostringstream walk_query;

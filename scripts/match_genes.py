@@ -4,11 +4,20 @@ from collections import defaultdict
 
 class GeneSite:
     def __init__(self, line):
+#        print line
         words = re.split("[ \t]", line)
-        self.gene = words[1]
+#        print words
+        (symbol, tss) = words[1].split(":")
+        self.gene = symbol
         self.chromosome = words[2]
         self.start = int(words[3])
         self.end = int(words[4])
+
+#        words = re.split("[ \t]", line)
+#        self.gene = words[1]
+#        self.chromosome = words[2]
+#        self.start = int(words[3])
+#        self.end = int(words[4])
 
     def __repr__(self):
         return "<%s %s %s %s>" % (self.gene, self.chromosome, self.start, self.end)
@@ -19,7 +28,19 @@ class GeneSite:
 
 sites = []
 with open(sys.argv[1]) as sites_file:
+    print sys.argv
+    if len(sys.argv) > 4:
+        limit = int(sys.argv[4])
+    else:
+        limit = None
+    print "limit: %s" % limit
+    next(sites_file)
     for line in sites_file:
+        print "limit: %s, sites: %s\n" % (limit, len(sites))
+        if limit is not None and len(sites) > limit:
+            break
+        if line[0] == "db.desc1":
+            continue
         if line[0] == '#':
             continue
         site = GeneSite(line)
@@ -71,7 +92,7 @@ print "reading chromosome files."
 
 chromosome_files = defaultdict(str)
 for chromosome in chromosomes:
-    with open("hg19_chromosomes/" + chromosome + ".fa", 'r') as chromosome_file:
+    with open(sys.argv[2] + chromosome + ".fa", 'r') as chromosome_file:
 
         contents = chromosome_file.read()
         pos = contents.index('\n')
@@ -85,15 +106,19 @@ for chromosome in chromosomes:
 
 print "read chromosome files.";
 
-for unduplicated_site in unduplicated_sites:
-    contents_len = len(chromosome_files[unduplicated_site.chromosome])
-    #print "chromosome length: %d, gene start: %d, gene end: %d" % (contents_len, unduplicated_site.start, unduplicated_site.end)
+with open(sys.argv[3], 'w') as out:
+    for unduplicated_site in unduplicated_sites:
+        contents_len = len(chromosome_files[unduplicated_site.chromosome])
+        #print "chromosome length: %d, gene start: %d, gene end: %d" % (contents_len, unduplicated_site.start, unduplicated_site.end)
 
-    snip = chromosome_files[unduplicated_site.chromosome][unduplicated_site.start:unduplicated_site.end]
+        snip = chromosome_files[unduplicated_site.chromosome][unduplicated_site.start:unduplicated_site.end]
 
-    if snip == '':
-        print "ERROR: snip was '' for: ", unduplicated_site
-    else:
-        print ">", unduplicated_site
-        print snip
-        print ""
+        if snip == '':
+             print "ERROR: snip was '' for: ", unduplicated_site
+        else:
+             out.write("> %s\n" % unduplicated_site)
+             out.write("%s\n" % snip)
+             out.write("\n")
+#       print ">", unduplicated_site
+#       print snip
+#       print ""

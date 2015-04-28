@@ -130,21 +130,21 @@ int read_sites_from_checkpoint(string sites_filename, vector<Sequence*> *sequenc
     sites_file >> s >> seed;
     if (s.compare("seed:") != 0) {
         cerr << "ERROR: malformed sites checkpoint! could not read 'seed'" << endl;
-        exit(0);
+        exit(1);
     }
 //    cerr << "seed: " << seed << endl;
 
     sites_file >> s >> iteration;
     if (s.compare("iteration:") != 0) {
         cerr << "ERROR: malformed sites checkpoint! could not read 'iteration'" << endl;
-        exit(0);
+        exit(1);
     }
 //    cerr << "iteration: " << iteration << endl;
 
     sites_file >> s >> independent_walk;
     if (s.compare("independent_walk:") != 0) {
         cerr << "ERROR: malformed sites checkpoint! could not read 'independent_walk'" << endl;
-        exit(0);
+        exit(1);
     }
 //    cerr << "independent_walk: " << independent_walk << endl;
 
@@ -165,7 +165,7 @@ void read_sites_from_file(ifstream &sites_file, vector<Sequence*> *sequences) {
 //            cout << "current sequence: " << current_sequence << ", current line: " << current_line << endl;
             if (current_sequence >= (int)sequences->size()) {
                 cerr << "ERROR: sites_file contains sites for more sequences than in sequences file." << endl;
-                exit(0);
+                exit(1);
             }
 
             int initial_size = sequences->at(current_sequence)->sampled_sites.size();
@@ -256,7 +256,7 @@ int read_accumulated_samples(string filename, vector<Sequence*> *sequences) {
             if ( !getline(instream, line) ) {
                 cerr << "ERROR in reading samples checkpoint, should read more sequence information but could not read another line" << endl;
                 cerr << "ERROR on line [" << __LINE__ << "], file [" <<__FILE__ << "]" << endl;
-                exit(0);
+                exit(1);
             }
 
 //            cout << "line: '" << line << "'" << endl << endl;
@@ -268,7 +268,7 @@ int read_accumulated_samples(string filename, vector<Sequence*> *sequences) {
                     cerr << "ERROR: reading samples, reached end of samples before all samples should have been read." << endl;
                     cerr << "accumulated sample: [" << k << "], prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "]" << endl;
                     cerr << "error on line [" << __LINE__ << "], file [" << __FILE__ << "]" << endl;
-                    exit(0);
+                    exit(1);
                 }
 
 //                cerr << "prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "], str: '" << line.substr(prev_comma_pos, current_comma_pos - prev_comma_pos) << "'" << endl;
@@ -287,7 +287,7 @@ int read_accumulated_samples(string filename, vector<Sequence*> *sequences) {
                 cerr << "ERROR: reading samples, more samples available after all samples should have been read." << endl;
                 cerr << "prev_comma_pos: [" << prev_comma_pos << "], current_comma_pos: [" << current_comma_pos << "]" << endl;
                 cerr << "error on line [" << __LINE__ << "], file [" << __FILE__ << "]" << endl;
-                exit(0);
+                exit(1);
             }
         }
     }

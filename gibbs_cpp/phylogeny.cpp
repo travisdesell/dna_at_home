@@ -175,7 +175,7 @@ PhylogenyTreeNode::PhylogenyTreeNode(string phylip_string, int &start, vector<Se
                 cerr << "   " << phylip_string << endl;
                 cerr << "   " << make_whitespace(start) << "^" << endl;
                 cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-                exit(0);
+                exit(1);
             }
         }
         start++;
@@ -191,7 +191,7 @@ PhylogenyTreeNode::PhylogenyTreeNode(string phylip_string, int &start, vector<Se
             cerr << "   " << phylip_string << endl;
             cerr << "   " << make_whitespace(start) << "^" << endl;
             cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-            exit(0);
+            exit(1);
         } 
         sequence_name = "INTERNAL";
 
@@ -205,7 +205,7 @@ PhylogenyTreeNode::PhylogenyTreeNode(string phylip_string, int &start, vector<Se
                 cerr << "   " << phylip_string << endl;
                 cerr << "   " << make_whitespace(start) << "^" << endl;
                 cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-                exit(0);
+                exit(1);
         }
         sequence_name = phylip_string.substr(start, colon_pos - start);
 
@@ -224,7 +224,7 @@ PhylogenyTreeNode::PhylogenyTreeNode(string phylip_string, int &start, vector<Se
         if (leaf_sequence == NULL) {
             cerr << "ERROR: could not find matching sequence for phylip tree leaf: " << sequence_name << endl;
             cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-            exit(0);
+            exit(1);
         }
         start = colon_pos;
     }
@@ -242,7 +242,7 @@ PhylogenyTreeNode::PhylogenyTreeNode(string phylip_string, int &start, vector<Se
             cerr << "   " << phylip_string << endl;
             cerr << "   " << make_whitespace(start) << "^" << endl;
             cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-            exit(0);
+            exit(1);
     }
 
     evolution_time = atof( phylip_string.substr(start + 1, (end - start) - 1).c_str() );
@@ -345,7 +345,7 @@ void PhylogenyTree::init(string _phylip_string, vector<Sequence*> *sequences) {
         cerr << "   " << phylip_string << endl;
         cerr << "   " << make_whitespace(position) << "^" << endl;
         cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-        exit(0);
+        exit(1);
     }
 
     vector<bool> sequence_match(sequences->size(), false);
@@ -362,7 +362,7 @@ void PhylogenyTree::init(string _phylip_string, vector<Sequence*> *sequences) {
     }
     if (error) {
         cerr << "   occurred in [" << __FILE__ << "] on line: " << __LINE__ << endl;
-        exit(0);
+        exit(1);
     }
 
 //    print();
