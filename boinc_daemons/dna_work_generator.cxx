@@ -76,6 +76,7 @@ using std::string;
 
 //from undvc_common
 #include "file_io.hxx"
+#include "arguments.hxx"
 
 #define CUSHION 100
     // maintain at least this many unsent results
@@ -124,9 +125,9 @@ int get_sequence_data(string sequence_filename, int &number_nucleotides, int &nu
         }
 
         if (line.find_first_not_of(' ') == string::npos) continue;
-        if (line.find_first_not_of("ACGTacgt") != string::npos) {
+        if (line.find_first_not_of("ACGTXacgtx") != string::npos) {
             cerr << "ERROR: malformed sequence file: '" << sequence_filename << "'" << endl;
-            cerr << "Nucleotide that was not A, C, G, T, a c g or t." << endl;
+            cerr << "Nucleotide that was not A, C, G, T, X, a c g t or x." << endl;
             cerr << "Problem on line: " << line_number << endl;
             cerr << "line: '" << line << "'" << endl;
             continue;
@@ -225,9 +226,14 @@ int create_workunit(MYSQL *conn, const string &sampler_name, const string &seque
 }
 
 void main_loop(const vector<string> &arguments, MYSQL *conn) {
-    string sampler_name = arguments[1];
-    string sequences_filename = arguments[2];
-    int number_walks = atoi(arguments[3].c_str());
+    string sampler_name;
+    get_argument(arguments, "--sampler_name", true, sampler_name);
+
+    string sequences_filename;
+    get_argument(arguments, "--sequences_filename", true, sequences_filename);
+
+    int number_walks;
+    get_argument(arguments, "--number_walks", true, number_walks);
 
     int workunit_steps   = 10000;
     int burn_in          = 0;                   //burn in for the full walk
@@ -240,8 +246,16 @@ void main_loop(const vector<string> &arguments, MYSQL *conn) {
     int numberSequences;
     get_sequence_data(sequences_filename, numberNucleotides, numberSequences);
 
-    int numberMotifs = 6;
-    int modelWidth = 8;
+    int numberMotifs;   // = 6
+    get_argument(arguments, "--number_motifs", true, numberMotifs);
+    if (numberMotifs % 2 != 0) {
+        cerr << "Invalid number of motifs, must be divisible by 2." << endl;
+        exit(1);
+    }
+
+    int modelWidth; // = 8
+    get_argument(arguments, "--model_width", true, modelWidth);
+
     ostringstream motif_string;
     for (int i = 0; i < numberMotifs / 2; i++) {
         motif_string << " forward," << modelWidth << " reverse," << modelWidth;
@@ -345,31 +359,14 @@ void usage(char *name) {
 }
 
 int main(int argc, char** argv) {
-    int i, retval;
+    int retval;
     char buf[256];
+    vector<string> arguments(argv, argv + argc);
 
-    for (i=1; i<argc; i++) {
-        if (is_arg(argv[i], "d")) {
-            if (!argv[++i]) {
-                log_messages.printf(MSG_CRITICAL, "%s requires an argument\n\n", argv[--i]);
-                usage(argv[0]);
-                exit(1);
-            }
-            int dl = atoi(argv[i]);
-            log_messages.set_debug_level(dl);
-            if (dl == 4) g_print_queries = true;
-        } else if (is_arg(argv[i], "h") || is_arg(argv[i], "help")) {
-            usage(argv[0]);
-            exit(0);
-        } else if (is_arg(argv[i], "v") || is_arg(argv[i], "version")) {
-            printf("%s\n", SVN_VERSION);
-            exit(0);
-//        } else {
-//            log_messages.printf(MSG_CRITICAL, "unknown command line argument: %s\n\n", argv[i]);
-//            usage(argv[0]);
-//            exit(1);
-        }
-    }
+    int dl = 3;
+    get_argument(arguments, "--d", false, dl);
+    log_messages.set_debug_level(dl);
+    if (dl == 4) g_print_queries = true;
 
     //Aaron Comment: if at any time the retval value is greater than 0, then the program
     //has failed in some manner, and the program then exits.
@@ -412,5 +409,5 @@ int main(int argc, char** argv) {
 
     log_messages.printf(MSG_NORMAL, "Starting\n");
 
-    main_loop(vector<string>(argv, argv + argc), boinc_db.mysql);
+    main_loop(arguments, boinc_db.mysql);
 }
