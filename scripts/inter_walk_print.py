@@ -2,6 +2,7 @@
 """ sum and possible average the motifs we've found.  consider weighted average"""
 
 import json
+import csv
 import re
 from optparse import OptionParser
 import os
@@ -24,6 +25,8 @@ def main():
     parser.add_option("--step", dest="step", help="Which step should be compared?", metavar="INT", type="int")
     parser.add_option("--sample_dir", dest="sample_dir", help="What sample directory should be used?", metavar="STRING", type="string")
     parser.add_option("--best_pct", dest="best_pct", help="What was the pct cutoff used to generate the data?", metavar="FLOAT", type="float")
+    parser.add_option("--ebox_only", dest="ebox_only", help="Only return motifs containing ebox with motif or neighbors", action="store_true", default=False)
+    parser.add_option("--tabbed_csv", dest="tabbed_csv", help="Produce a tab delimited csv instead of latex format output", action="store_true", default=False)
 
     (options, args) = parser.parse_args()
     if not options.step or not options.sample_dir or not options.best_pct:
@@ -70,9 +73,17 @@ def main():
 
 
     out = completion(motif_stats)
-    with open("%s/motif_stats_%s_%s.json" % (options.sample_dir, tail, options.step), "w") as out_file:
+    out_name = "%s/motif_stats_%s_%s.json"
+    if options.tabbed_csv:
+        out_name = "%s/motif_stats_%s_%s.csv"
+
+    with open(out_name % (options.sample_dir, tail, options.step), "w") as out_file:
         #json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
-        json.dump(out, out_file, indent=4, separators=(',', ': '))
+        if options.tabbed_csv:
+            writer = csv.writer(out_file, dialect=csv.excel-tab) 
+            writer.write_rows(out)
+        else:
+            json.dump(out, out_file, indent=4, separators=(',', ': '))
         out_file.close()
 
 #motif_stats plan
@@ -117,6 +128,7 @@ def process_line(motif_stats, line):
             seq_num = int(seq_num)
             motif_num = int(motif_num)
 
+            #combine neighbors with motif for sorting and searching for ebox
             super_motif = "%s%s%s" % (lneighbor, motif, rneighbor)
 
 
@@ -134,7 +146,7 @@ def process_line(motif_stats, line):
             if EBOXG_R.match(super_motif):
                 leboxg = True
 
-            if not (leboxc or leboxg):
+            if options.ebox_only and not (leboxc or leboxg):
                 return
 
             pct = float(pct) * 100
@@ -151,7 +163,10 @@ def process_line(motif_stats, line):
                     "cacctg" : leboxc,
                     "caggtg" : leboxg,
                     "start" : start,
-                    "sos_pct" : 0.0
+                    "sos_pct" : 0.0,
+                    "lneighbor" : lneighbor,
+                    "rneighbor" : rneighbor,
+                    "motif" : motif
                 }
 #
             lmod = motif_stats["by_gene"][gene_id][super_motif]
@@ -210,8 +225,15 @@ def completion(motif_stats):
 #            lmotif["avg_pct"] = lmotif["total_pct"] / motif_stats["sample_count"]
             lmotif["std_dev_best"] = math.sqrt((lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"] / lmotif["count"])/lmotif["count"])
             if lmotif["count"] > 100 and lmotif["avg_pct_best"] > 10:
-                readable.append("& ".join((str(lmotif["count"]), str(lmotif["avg_pct_best"]), gene_id, str(lmotif["start"]), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))) )
+                if options.tabbed_csv:
+                    #estimated tss offset is due to combined genes.  if we had 2 tss...
+                    (gene_symbol, chromosome, left, right) = gene_id.split(" ")
+                    readable.append("\t".join(("%d" % (lmotif["count"]), "%.2f" % (lmotif["avg_pct_best"]), gene_symbol, chromosome, left, right, str(int(left) + lmotif["start"]), str(lmotif["start"] - (int(right) - int(left))/2), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))))
+                else:
+                    readable.append("& ".join(("%d" % (lmotif["count"]), "%.2f" % (lmotif["avg_pct_best"]), gene_id, str(lmotif["start"]), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))))
     sort_nicely(readable)
+    if options.tabbed_csv:
+        readable.insert(0, ("\t".join("count", "avg_pct", "gene_symbol", "chromosome", "interval_start", "interval_end", "start_offset", "estimated_tss_offset", "motif", "cacctg", "caggtg")))
     return readable
 #            lmotif["std_dev"] = ((
 #                lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]
@@ -244,7 +266,6 @@ def completion(motif_stats):
 #        if EBOXG_R.match(super_motif):
 #            gmotif["eboxg"] = True
 #
-import re
 def tryint(s):
     try:
         return int(s)
