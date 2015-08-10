@@ -8,14 +8,13 @@ from optparse import OptionParser
 import os
 import math
 
-#no match?     0, 0     988 atgtt CCTCCT tttcc     993 0.2110 > 'PEF1 chr1 32109718 32110718'
+#no match?     0, 0     988 atgtt CCTCCT tttcc     993 0.2110 > 'ISG15 chr1 948346 949346 948846 +'
 HEADER_R = re.compile("^[FR]|$")
 BODY_R = re.compile(r"^\s+(\d+),\s*(\d+)\s+(\d+)\s+([a-z]*)\s*([A-Z]+)\s*([a-z]*)\s+(\d+)\s+([0-9\.]+)\s+>\s+'([^']+)'$")
 
 #these guys are the proof in the pudding
 EBOXC_R = re.compile(r"CACCTG", flags=re.IGNORECASE)
 EBOXG_R = re.compile(r"CAGGTG", flags=re.IGNORECASE)
-
 
 def main():
     """ cleanup"""
@@ -55,14 +54,14 @@ def main():
         "motif_num" : -1,
         "seq_num" : -1
     }
-
+    print files
 
     for walk in files:
-    #for walk in result:
 
+        print "walk: %s" % walk
         with open("%s/%s" % (options.sample_dir, walk), "r") as in_file:
             try:
-                gen = (process_line(motif_stats, line) for line in in_file)
+                gen = (process_line(motif_stats, line, options) for line in in_file)
 
                 while 1:
                     next(gen)
@@ -71,8 +70,9 @@ def main():
                 print "file %s done" % walk
                 in_file.close()
 
-
-    out = completion(motif_stats)
+    print "motif_stats: %s" % motif_stats
+    out = completion(motif_stats, options)
+    print "out: %s" % out
     out_name = "%s/motif_stats_%s_%s.json"
     if options.tabbed_csv:
         out_name = "%s/motif_stats_%s_%s.csv"
@@ -80,8 +80,9 @@ def main():
     with open(out_name % (options.sample_dir, tail, options.step), "w") as out_file:
         #json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
         if options.tabbed_csv:
-            writer = csv.writer(out_file, dialect=csv.excel-tab) 
-            writer.write_rows(out)
+            writer = csv.writer(out_file, dialect=csv.excel_tab)
+            for row in out:
+                writer.writerow(row.split("\t"))
         else:
             json.dump(out, out_file, indent=4, separators=(',', ': '))
         out_file.close()
@@ -114,8 +115,8 @@ def main():
 #    },
 #  }
 #}
-#XXX we can process for neigbors or other stats later
-def process_line(motif_stats, line):
+# we can process for neigbors or other stats later
+def process_line(motif_stats, line, options):
     """ read a line, process it and add it to the motifs"""
 
     if HEADER_R.match(line):
@@ -151,10 +152,26 @@ def process_line(motif_stats, line):
 
             pct = float(pct) * 100
 
+            # so the gene_id is everything in the '' here
+            #no match?     0, 0     988 atgtt CCTCCT tttcc     993 0.2110 > 'ISG15 chr1 948346 949346 948846 +'
+            #this is not so efficient, we only really need ISG15.  It won't appear again right?
+            #we do need all of this information but a shorter hash key would be good
+            #what is in the gene_id:  gene symbol, chromosome, region start, region end, transcription start, strand
+            #note the gene_symbol and transcription start and strand may be a comma spearated list
+            #if you have to work with gene symbols that already contain punctuation, the guy that chose the symbol
+            #needs a talking to
+
+            (gene_symbol, chrom, region_start, region_end, tss, strand) = gene_id.split(" ")
             if gene_id not in motif_stats["by_gene"]:
                 motif_stats["by_gene"][gene_id] = {}
 
             if super_motif not in motif_stats["by_gene"][gene_id]:
+
+                tss_offsets = []
+                for single_tss in tss.split(","):
+                    
+                    tss_offsets.append(str(int(single_tss) - (int(region_start) + int(start))))
+
                 motif_stats["by_gene"][gene_id][super_motif] = {
                     "total_pct" : 0.0,
                     "count" : 0.0,
@@ -166,7 +183,14 @@ def process_line(motif_stats, line):
                     "sos_pct" : 0.0,
                     "lneighbor" : lneighbor,
                     "rneighbor" : rneighbor,
-                    "motif" : motif
+                    "motif" : motif,
+                    "gene_symbol" : gene_symbol,
+                    "chrom" : chrom,
+                    "region_start" : region_start,
+                    "region_end" : region_end,
+                    "tss" : tss,
+                    "strand" : strand,
+                    "tss_offset" : ",".join(tss_offsets)
                 }
 #
             lmod = motif_stats["by_gene"][gene_id][super_motif]
@@ -214,7 +238,7 @@ def process_line(motif_stats, line):
         else:
             print "no match? %s" % line
 
-def completion(motif_stats):
+def completion(motif_stats, options):
     """ finalize statistics"""
     readable = []
     for gene_id in motif_stats["by_gene"]:
@@ -227,13 +251,52 @@ def completion(motif_stats):
             if lmotif["count"] > 100 and lmotif["avg_pct_best"] > 10:
                 if options.tabbed_csv:
                     #estimated tss offset is due to combined genes.  if we had 2 tss...
-                    (gene_symbol, chromosome, left, right) = gene_id.split(" ")
-                    readable.append("\t".join(("%d" % (lmotif["count"]), "%.2f" % (lmotif["avg_pct_best"]), gene_symbol, chromosome, left, right, str(int(left) + lmotif["start"]), str(lmotif["start"] - (int(right) - int(left))/2), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))))
+                    readable.append("\t".join((
+                        "%d" % (lmotif["count"]),
+                        "%.2f" % (lmotif["avg_pct_best"]),
+                        lmotif["gene_symbol"],
+                        lmotif["chrom"],
+                        lmotif["region_start"],
+                        lmotif["region_end"],
+                        lmotif["tss"],
+                        lmotif["tss_offset"],
+                        lmotif["lneighbor"],
+                        lmotif["motif"],
+                        lmotif["rneighbor"],
+                        super_motif,
+                        str(lmotif["cacctg"]),
+                        str(lmotif["caggtg"]),
+                        lmotif["strand"]
+                    )))
                 else:
-                    readable.append("& ".join(("%d" % (lmotif["count"]), "%.2f" % (lmotif["avg_pct_best"]), gene_id, str(lmotif["start"]), super_motif, str(lmotif["cacctg"]), str(lmotif["caggtg"]))))
+                    readable.append("& ".join((
+                        "%d" % (lmotif["count"]),
+                        "%.2f" % (lmotif["avg_pct_best"]),
+                        gene_id,
+                        str(lmotif["start"]),
+                        super_motif,
+                        str(lmotif["cacctg"]),
+                        str(lmotif["caggtg"])
+                    )))
     sort_nicely(readable)
     if options.tabbed_csv:
-        readable.insert(0, ("\t".join("count", "avg_pct", "gene_symbol", "chromosome", "interval_start", "interval_end", "start_offset", "estimated_tss_offset", "motif", "cacctg", "caggtg")))
+        readable.insert(0, ("\t".join((
+            "count",
+            "avg_pct",
+            "gene_symbol",
+            "chromosome",
+            "interval_start",
+            "interval_end",
+            "tss",
+            "tss_offset",
+            "left_neighbor",
+            "motif",
+            "right_neighbor",
+            "combined_motif",
+            "cacctg",
+            "caggtg",
+            "strand"
+        ))))
     return readable
 #            lmotif["std_dev"] = ((
 #                lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"]
@@ -280,4 +343,3 @@ def sort_nicely(l):
 
 if __name__ == "__main__":
     main()
-
