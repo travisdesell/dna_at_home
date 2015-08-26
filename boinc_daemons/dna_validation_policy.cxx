@@ -127,6 +127,29 @@ int init_result(RESULT& result, void*& data) {
     return 0;
 }
 
+void split_samples(const string &s, vector< vector<int> > &values) {
+    values.clear();
+
+    stringstream line_stream(s);
+    string line;
+    int current = 0;
+    //cout << "parsing samples!" << endl;
+    while (getline(line_stream, line, '\n')) {
+        stringstream value_stream(line);
+        string value;
+
+        values.push_back(vector<int>());
+
+        while (getline(value_stream, value, ',')) {
+            values[current].push_back( atoi(value.c_str()) );
+
+            //cout << " " << values[current].back();
+        }
+        current++;
+        //cout << endl;
+    }
+}
+
 int compare_results(
     RESULT & r1, void* data1,
     RESULT const& r2, void* data2,
@@ -137,21 +160,67 @@ int compare_results(
     ResultData *rd1 = (ResultData*)data1;
     ResultData *rd2 = (ResultData*)data2;
 
-    if (strcmp(rd1->current_sites, rd2->current_sites) == 0) {
-        if (strcmp(rd1->current_samples, rd2->current_samples) == 0) {
+    if (strcmp(rd1->current_samples, rd2->current_samples) == 0) {
+        if (strcmp(rd1->current_sites, rd2->current_sites) == 0) {
             log_messages.printf(MSG_CRITICAL, "sites and samples match!\n");
             match = true;
             return 0;
 
         } else {
-            log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n%s\nvs\n%s\n", rd1->current_samples, rd2->current_samples);
+            log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n");
+            //log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n%s\nvs\n%s\n", rd1->current_sites, rd2->current_sites);
+
             match = false;
             //exit(1);
             return 0;
         }
 
     } else {
-        log_messages.printf(MSG_CRITICAL, "ERROR, current_sites are different.\n%s\nvs\n%s\n", rd1->current_sites, rd2->current_sites);
+        log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n");
+        //log_messages.printf(MSG_CRITICAL, "ERROR, current_samples are different.\n%s\nvs\n%s\n", rd1->current_samples, rd2->current_samples);
+
+        vector< vector<int> > samples1;
+        vector< vector<int> > samples2;
+
+        split_samples(rd1->current_samples, samples1);
+        split_samples(rd2->current_samples, samples2);
+
+        log_messages.printf(MSG_CRITICAL, "samples1 size: %zu, samples2 size: %zu\n", samples1.size(), samples2.size());
+
+        if (samples1.size() != samples2.size()) {
+            log_messages.printf(MSG_CRITICAL, "ERROR, samples1 and samples2 have a different number of sequences: %zu vs %zu.\n", samples1.size(), samples2.size());
+            //exit(1);
+            match = false;
+            return 0;
+        }
+
+        uint64_t sum_difference = 0, total_sites = 0;
+        uint64_t sum1 = 0, sum2 = 0;
+        uint64_t max_difference = 0;
+        uint64_t diff = 0;
+        uint64_t diffs_over_100 = 0;
+        for (uint32_t i = 0; i < samples1.size(); i++) {
+            log_messages.printf(MSG_CRITICAL, "samples1[%d] size: %zu, samples2[%d] size: %zu\n", i, samples1[i].size(), i, samples2[i].size());
+
+            if (samples1[i].size() != samples2[i].size()) {
+                log_messages.printf(MSG_CRITICAL, "ERROR, samples1[%d] and samples2[%d] have a different number of nucleotides: %zu vs %zu.\n", i, i, samples1[i].size(), samples2[i].size());
+                //exit(1);
+            }
+
+            for (uint32_t j = 0; j < samples1[i].size(); j++) {
+                sum1 += samples1[i][j];
+                sum2 += samples2[i][j];
+                diff = (uint64_t)abs(samples1[i][j] - samples2[i][j]);
+                sum_difference += diff;
+                total_sites++;
+
+                if (max_difference < diff) max_difference = diff;
+                if (diff > 100) diffs_over_100++;
+            }
+        }
+        log_messages.printf(MSG_CRITICAL, "sum of samples1: %ld, sum of samples2: %ld, max difference: %ld, diffs_over_100: %ld\n", sum1, sum2, max_difference, diffs_over_100);
+        log_messages.printf(MSG_CRITICAL, "ERROR, sum difference of samples was: %ld, total sites sampled: %ld, average difference: %lf\n", sum_difference, total_sites, (double)sum_difference/(double)total_sites);
+
         match = false;
         //exit(1);
         return 0;

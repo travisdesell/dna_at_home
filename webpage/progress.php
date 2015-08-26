@@ -9,7 +9,7 @@ require_once($cwd[__FILE__] . "/../../citizen_science_grid/navbar.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/footer.php");
 require_once($cwd[__FILE__] . "/../../citizen_science_grid/my_query.php");
 
-$sampler_id = mysql_real_escape_string($_GET['id']);
+$sampler_id = $boinc_db->real_escape_string($_GET['id']);
 
 $sampler_result = query_boinc_db("SELECT samples, name FROM gibbs_sampler WHERE id = $sampler_id");
 $sampler_row = $sampler_result->fetch_assoc();
