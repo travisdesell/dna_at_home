@@ -3,10 +3,10 @@
 #import MySQLdb
 import re
 from optparse import OptionParser
-#import subprocess
+import subprocess
 #import shlex
 import os
-
+import sys
 
 def main():
     """It all starts here"""
@@ -25,14 +25,21 @@ def main():
 
     (file_values, total_files) = get_files_in_dir(options.sample_dir)
     commands = make_commands(file_values, options.sample_dir, options.min_step)
-    print commands
+    #print commands
 
-    #if options.no_exec:
-    #    print "%s > %s.motifs" % (args, samples_file)
-    #else:
-    #    #with open("%s.motifs" % samples_file, "w+") as out_file:
-    #    #    subprocess.call(new_args, stdout=out_file)
-    #    pass
+    if options.no_exec:
+        print commands
+    else:
+        for command in commands:
+            try:
+                retcode = subprocess.call(command)
+                if retcode < 0:
+                    print >>sys.stderr, "Child was terminated by signal", -retcode
+                else:
+                    print >>sys.stderr, "Child returned", retcode
+            except OSError, e:
+                print >>sys.stderr, command
+                print >>sys.stderr, "Execution failed:", e
 
 def get_files_in_dir(in_dir):
     """Organize files by walk and sort"""
@@ -69,7 +76,8 @@ def make_commands(file_values, sample_dir, min_step):
         print "WALK_NUM: %s\n" % walk_num
 
         #qsub sum_walk.pbs -v <walk_dir> <walk_num> <min_step>
-        commands.append(" ".join(("qsub", "sum_walk.pbs", "-v", "ARGS=\"%s\"" % " ".join(( sample_dir, str(walk_num), str(min_step))))))
+        #commands.append("qsub run_script.pbs -v SCRIPT=\"sum_walk.py --sample_dir %s --walk_num %s --min_step %s\"" % ((sample_dir, str(walk_num), str(min_step))))
+        commands.append("python sum_walk.py --sample_dir %s --walk_num %s --min_step %s" % ((sample_dir, str(walk_num), str(min_step))))
 	    #new_args = shlex.split(args) do we need shlex?
     return commands
 
