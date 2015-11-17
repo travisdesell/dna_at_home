@@ -55,6 +55,11 @@ def sum_files(file_values):
         print "summing file: %s" % in_file
         data = None
         with open(in_file, 'r') as in_data:
+
+            #data = np.genfromtxt(in_file, dtype="int", 
+            #data_a = np.fromstring(",".join([line.rstrip() for line in thing_a]), dtype=int, sep=",")
+            #XXX this only reads the first line.  our dataset is jagged due to differnt lengths from merged genes
+            #need to pad for now to simplify array addition then strip out the padded values when writing out
             data = np.fromstring(in_data.read(), dtype=int, sep=",")
 
         if sum_data == None:
