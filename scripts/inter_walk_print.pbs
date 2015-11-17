@@ -14,7 +14,7 @@ if [ -z "${ARGS+xxx}" ]; then
 fi
 
 echo "build command"
-CMD="/home/kristopher.zarns/dna_at_home/scripts/inter_walk_print.py $ARGS"
+CMD="/home/groupdirs/epigenetics/dna_at_home_results/dna_at_home/scripts/inter_walk_print.py $ARGS"
 echo "CMD: $CMD"
 
 #PBS -l nodes=1:ppn=1

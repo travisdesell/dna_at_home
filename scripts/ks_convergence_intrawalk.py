@@ -1,5 +1,10 @@
 #!/usr/bin/python
 """Test for Gibbs Convergence"""
+
+import sys
+import os
+#print sys.path
+#print os.listdir("/usr/lib64/python2.6/site-packages")
 import numpy as np
 import time
 import math
@@ -8,15 +13,17 @@ from scipy.stats import ks_2samp
 import matplotlib as mpl
 mpl.use('Agg') #tells pyplot this is a headless node
 import matplotlib.pyplot as plt
-import os
 import re
-import sys
 import json
+import MySQLdb
+
+
+
 
 USAGE = "\n".join([
-    "python ks_intrawalk_convergence.py <IN_DIR> <OUT_GRAPH> <OUT_DATA> [plot_data_file_name]",
-    #"$ ./ks_convergence_intrawalk.py /home/kzarns/test_hg19_10fa_5 test_graph6 test_data test_data.json > tmp.js",
-    "$ ./ks_convergence_intrawalk.py /home/kzarns/test_hg19_10fa_5 \"graph title\"",
+    "python ks_intrawalk_convergence.py <IN_DIR> <OUT_GRAPH> db_passwd",
+    #"$ ./ks_convergence_intrawalk.py /home/kzarns/test_hg19_10fa_5 test_graph6 passwd",
+    "$ ./ks_convergence_intrawalk.py /home/kzarns/test_hg19_10fa_5 \"graph title\" passwd",
     "Plots the kolmogorov Smirnov Statistic which compares two distributions",
     "Each step file within a walk represents a new distribution",
     "Over a number of steps those distributions should start to converge",
@@ -38,11 +45,14 @@ USAGE = "\n".join([
 def main():
     """Just so we don't have a global variable mess"""
 
+
+
+
     in_dir = None
     out_graph_file_name = None
     out_data_file_name = None
     plot_data_file_name = None
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print "bad dir? : %s, %s" % (sys.argv, USAGE)
         sys.exit(1)
 
@@ -51,28 +61,79 @@ def main():
 
     title = sys.argv[2]
 
+    passwd = sys.argv[3]
     (head, tail) = os.path.split(in_dir)
     if tail == "":
         (head, tail) = os.path.split(head)
 
-    out_graph_file_name = "%s/%s.png" % (head, tail)
-    out_stats_graph_file_name = "%s/%s_stats.png" % (head, tail)
+    out_graph_file_name = "%s/%s/%s_full.png" % (head, tail, tail)
+    out_stats_graph_file_name = "%s/%s/%s_stats_full.png" % (head, tail, tail)
     print "out_graph_file_name: %s" % out_graph_file_name
     print "out_stats_graph_file_name: %s" % out_stats_graph_file_name
-    out_data_file_name = "%s/%s/%s.json" % (head, tail, tail)
+    out_data_file_name = "%s/%s/%s_full.json" % (head, tail, tail)
     print "out_data_file_name: %s" % out_data_file_name
 
     if os.path.exists(out_data_file_name):
         plot_data_file_name = out_data_file_name
         print "plot_data_file_name: %s" % plot_data_file_name
 
-    (file_values, total_files) = get_files_in_dir(in_dir)
-    data = process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files, plot_data_file_name)
-    #plot_data(data, out_graph_file_name, title)
-    plot_data_stats(data, out_stats_graph_file_name, title)
+#    print "create connection\n"
+#    db = MySQLdb.connect(
+#        host="172.16.182.228",
+#        user="tdesell",
+#        passwd=passwd,
+#        db="csg",
+#        port=3306
+#    )
+#    print "connected\n"
+#    cur = db.cursor()
+#    cur.execute(
+#        "\n".join((
+#            "UPDATE gibbs_sampler",
+#            "JOIN gibbs_post_status",
+#            "   ON sampler_id = gibbs_sampler.id",
+#            "SET run_ks = 'running',",
+#            "run_ks_exception = NULL,",
+#            "run_ks_job_id = %s",
+#            "WHERE name=%s"
+#        )),
+#        (os.environ['PBS_JOBID'], tail)
+#    )
+
+    try:
+        (file_values, total_files) = get_files_in_dir(in_dir)
+        data = process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files, plot_data_file_name)
+        #plot_data(data, out_graph_file_name, title)
+        plot_data_stats(data, out_stats_graph_file_name, title)
+#        cur.execute(
+#            "\n".join((
+#                "UPDATE gibbs_sampler",
+#                "JOIN gibbs_post_status",
+#                "   ON sampler_id = gibbs_sampler.id",
+#                "SET run_ks = 'rest',",
+#                "run_ks_job_id = NULL",
+#                "WHERE name=%s"
+#            )),
+#            (os.environ['PBS_JOBID'], tail)
+#        )
+
+    except Exception, ex:
+#        cur.execute(
+#            "\n".join((
+#                "UPDATE gibbs_sampler",
+#                "JOIN gibbs_post_status",
+#                "   ON sampler_id = gibbs_sampler.id",
+#                "SET run_ks = 'failed',",
+#                "run_ks_job_id = NULL",
+#                "run_ks_exception = %s",
+#                "WHERE name = %s"
+#            )),
+#            (ex, tail)
+#        )
+        print "ERROR: %s" % ex
 
 def ks_2(file_a=None, file_b=None, data_a=None, data_b=None):
-    """Perform the Komogorov Smirnov 2 sample comparison"""
+    """Perform the Kolmogorov Smirnov 2 sample comparison"""
     start_time = time.time()
     if data_a is None:
         if file_a is None:
@@ -80,14 +141,18 @@ def ks_2(file_a=None, file_b=None, data_a=None, data_b=None):
             raise ValueError()
         with open(file_a, 'r') as thing_a:
             #data_a = np.fromstring(thing_a.read(), dtype=int, sep=",").sort()
-            data_a = np.fromstring(thing_a.read(), dtype=int, sep=",")
+
+            data_a = np.fromstring(",".join([line.rstrip() for line in thing_a]), dtype=int, sep=",")
+            print "data_a_shape: %s" % data_a.shape
 
     if data_b is None:
         if file_b is None:
             raise ValueError("file_b is None and data_b is None")
         with open(file_b, 'r') as thing_b:
             #data_b = np.fromstring(thing_b.read(), dtype=int, sep=",").sort()
-            data_b = np.fromstring(thing_b.read(), dtype=int, sep=",")
+
+            data_b = np.fromstring(",".join([line.rstrip() for line in thing_b]), dtype=int, sep=",")
+            print "data_b_shape: %s" % data_b.shape
 
     data_read_time = time.time()
     dr_time = (data_read_time - start_time)
@@ -134,7 +199,7 @@ def process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files
             data = json.load(plot_data_file)
     #print data
 
-    (out_path, name) = os.path.split(in_dir)
+    #(out_path, name) = os.path.split(in_dir)
     processed_files = 0
     for walk in file_values:
         walk_str = str(walk)
@@ -168,6 +233,8 @@ def process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files
             #print "data[walk]: %s" % data[walk_str]
             #print "keys: %s" % data[walk_str].keys()
             #print "type keys: %s" % type(data[walk_str].keys())
+
+            #XXX diasbled for test of 1st line bug
             if step_str in data[walk_str]:
                 print "walk: %s, step: %s found data from previous run" % (walk_str, step_str)
                 continue
