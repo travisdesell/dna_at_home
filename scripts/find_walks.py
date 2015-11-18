@@ -28,18 +28,21 @@ def main():
     #print commands
 
     if options.no_exec:
-        print commands
+        for command in commands:
+            print command
     else:
         for command in commands:
-            try:
-                retcode = subprocess.call(command)
-                if retcode < 0:
-                    print >>sys.stderr, "Child was terminated by signal", -retcode
-                else:
-                    print >>sys.stderr, "Child returned", retcode
-            except OSError, e:
-                print >>sys.stderr, command
-                print >>sys.stderr, "Execution failed:", e
+            #XXX broken
+            subprocess.call(command, stdout = open("/dev/null", "w"),  stderr = open("/dev/null", "w"))
+#            try:
+#                retcode = subprocess.call(command)
+#                if retcode < 0:
+#                    print >>sys.stderr, "Child was terminated by signal", -retcode
+#                else:
+#                    print >>sys.stderr, "Child returned", retcode
+#            except OSError, e:
+#                print >>sys.stderr, command
+#                print >>sys.stderr, "Execution failed:", e
 
 def get_files_in_dir(in_dir):
     """Organize files by walk and sort"""
@@ -73,11 +76,11 @@ def make_commands(file_values, sample_dir, min_step):
     """build some commands"""
     commands = []
     for walk_num in file_values.keys():
-        print "WALK_NUM: %s\n" % walk_num
+        #print >>stderr, "WALK_NUM: %s\n" % walk_num
 
         #qsub sum_walk.pbs -v <walk_dir> <walk_num> <min_step>
-        #commands.append("qsub run_script.pbs -v SCRIPT=\"sum_walk.py --sample_dir %s --walk_num %s --min_step %s\"" % ((sample_dir, str(walk_num), str(min_step))))
-        commands.append("python sum_walk.py --sample_dir %s --walk_num %s --min_step %s" % ((sample_dir, str(walk_num), str(min_step))))
+        commands.append("qsub run.pbs -v SCRIPT=\"python sum_walk.py --sample_dir %s --walk_num %s --min_step %s\"" % ((sample_dir, str(walk_num), str(min_step))))
+        #commands.append("python sum_walk.py --sample_dir %s --walk_num %s --min_step %s" % ((sample_dir, str(walk_num), str(min_step))))
 	    #new_args = shlex.split(args) do we need shlex?
     return commands
 
