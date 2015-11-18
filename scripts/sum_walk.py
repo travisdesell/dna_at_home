@@ -1,7 +1,6 @@
 #!/usr/bin/python
 """identify files in a walk and sum"""
 import re
-import numpy as np
 from optparse import OptionParser
 import os
 
@@ -24,10 +23,15 @@ def main():
     file_values = get_files_in_walk(options.sample_dir, options.walk_num, int(options.min_step))
     #print file_values
     summed_files = sum_files(file_values)
-    print summed_files
+    #print summed_files
     file_out = "%s/walk_%s_steps_-1" % (options.sample_dir, str(options.walk_num))
+    print "this is output file: %s" % file_out
+    #np.savetxt(file_out, summed_files, fmt="%s", delimiter=",", newline="\n")
 
-    np.savetxt(file_out, summed_files, fmt="%s", delimiter=",", newline="\n")
+    with open(file_out, 'w') as out_data:
+        for  line in summed_files:
+            join_string=  ",".join([str(val) for val in line]) 
+            print >>out_data, join_string
 
 def get_files_in_walk(in_dir, walk_num, min_step):
     """Get files for a walk meeting minimum step"""
@@ -53,19 +57,26 @@ def sum_files(file_values):
     #count = 0
     for in_file in file_values:
         print "summing file: %s" % in_file
-        data = None
+        data = []
         with open(in_file, 'r') as in_data:
 
             #data = np.genfromtxt(in_file, dtype="int", 
             #data_a = np.fromstring(",".join([line.rstrip() for line in thing_a]), dtype=int, sep=",")
             #XXX this only reads the first line.  our dataset is jagged due to differnt lengths from merged genes
             #need to pad for now to simplify array addition then strip out the padded values when writing out
-            data = np.fromstring(in_data.read(), dtype=int, sep=",")
+            #whole_line_data = in_data.readlines()
+            #wholedata= [x.strip('\n') for x in data]
+            #data = whole_line_data.split(",")
+            for line in in_data:
+                line_no_end= line.rstrip('\n')
+                list_container = []
+                list_container = line_no_end.split(",")
+                data.append(list_container)
 
         if sum_data == None:
             sum_data = data
         else:
-            sum_data = sum_data + data
+            sum_data = [[int(sum_data[y][x]) + int(data[y][x]) for x in range(len(data[y]))] for y in range(len(data))]
         #count += 1
         #if count % 10 == 0:
             #print "count: %s, sum_data: %s" % ((count, sum_data))
