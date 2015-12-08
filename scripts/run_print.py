@@ -7,8 +7,9 @@ import shlex
 import os
 
 
+
 #usage = "usage: %prog [options] arg"
-usage = ""
+usage = "This is a meta script to generate new print_sampled_sites commands.  Run this outside of PBS until mysql access from compute nodes is enabled.  This generates the *.motif files from walk files.  Step -1 should be summed walk files."
 parser = OptionParser(usage)
 parser.add_option("--step", dest="step", help="Which step should be compared?", metavar="INT")
 parser.add_option("--sample_name", dest="sample_name", help="What sample should be used?", metavar="STRING")
@@ -17,6 +18,7 @@ parser.add_option("--best_pct", dest="best_pct", help="Whatis the minimum repres
 parser.add_option("--dna_root", dest="dna_root", help="where is the dna_at_home directory?", metavar="STRING")
 parser.add_option("--data_root", dest="data_root", help="where is the data directory?", metavar="STRING")
 parser.add_option("--seq_root", dest="seq_root", help="where is the seq directory?", metavar="STRING")
+parser.add_option("--db_host", dest="db_host", help="db_host", metavar="STRING")
 parser.add_option("--no_exec", dest="no_exec", help="writeout a shell script", action="store_true", default=False)
 
 (options, args) = parser.parse_args()
@@ -26,10 +28,10 @@ if not options.step or not options.sample_name:
 
 
 db = MySQLdb.connect(
-		host="localhost", 
+		host=options.db_host, 
 		user="tdesell",
 		passwd=options.passwd,
-		db="wildlife")
+		db="csg")
 
 cur = db.cursor()
 cur.execute(

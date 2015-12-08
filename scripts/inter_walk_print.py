@@ -70,13 +70,14 @@ def main():
                 print "file %s done" % walk
                 in_file.close()
 
-    print "motif_stats: %s" % motif_stats
+    #print "motif_stats: %s" % motif_stats
     out = completion(motif_stats, options)
-    print "out: %s" % out
+    #print "out: %s" % out
     out_name = "%s/motif_stats_%s_%s.json"
     if options.tabbed_csv:
         out_name = "%s/motif_stats_%s_%s.csv"
 
+    print "output written to: %s" % out_name
     with open(out_name % (options.sample_dir, tail, options.step), "w") as out_file:
         #json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
         if options.tabbed_csv:

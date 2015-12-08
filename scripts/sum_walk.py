@@ -20,11 +20,13 @@ def main():
         parser.print_help()
         parser.error("min_step or sample_dir or walk_num not given")
 
-    file_values = get_files_in_walk(options.sample_dir, options.walk_num, int(options.min_step))
+    file_temp = get_files_in_walk(options.sample_dir, options.walk_num, int(options.min_step))
+    file_values = file_temp[0]
+    max_step = file_temp[1]
     #print file_values
     summed_files = sum_files(file_values)
     #print summed_files
-    file_out = "%s/walk_%s_steps_-1" % (options.sample_dir, str(options.walk_num))
+    file_out = "%s/walk_%s_steps_range_%s_%s" % (options.sample_dir, str(options.walk_num), str(options.min_step), str(max_step))
     print "this is output file: %s" % file_out
     #np.savetxt(file_out, summed_files, fmt="%s", delimiter=",", newline="\n")
 
@@ -40,6 +42,7 @@ def get_files_in_walk(in_dir, walk_num, min_step):
     pattern = re.compile(r"^walk_%s_steps_(\d+)$" % str(walk_num))
     
     file_values = []
+    max_step = min_step
     for file_name in files:
         match = pattern.match(file_name)
 
@@ -47,8 +50,10 @@ def get_files_in_walk(in_dir, walk_num, min_step):
             step = int(match.group(1))
             if step >= min_step:
                 file_values.append("%s/%s" % (in_dir, file_name))
+            if step > max_step:
+                max_step = step
 
-    return file_values
+    return [file_values, max_step]
 
 def sum_files(file_values):
     """read in each file, sum the results as you go"""

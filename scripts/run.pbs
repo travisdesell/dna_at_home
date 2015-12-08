@@ -19,7 +19,8 @@ echo $SCRIPT
 echo " "
 echo " "
 echo "Job started on `hostname` at `date`"
-${SCRIPT}
+#note using eval now so redirects work
+eval ${SCRIPT}
 echo " "
 echo "Job Ended at `date`"
 echo " #"
