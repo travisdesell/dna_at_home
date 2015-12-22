@@ -66,8 +66,8 @@ def main():
     if tail == "":
         (head, tail) = os.path.split(head)
 
-    out_graph_file_name = "%s/%s/%s_full.png" % (head, tail, tail)
-    out_stats_graph_file_name = "%s/%s/%s_stats_full.png" % (head, tail, tail)
+    out_graph_file_name = "./%s_full.png" % (tail)
+    out_stats_graph_file_name = "./%s_stats_full.png" % (tail)
     print "out_graph_file_name: %s" % out_graph_file_name
     print "out_stats_graph_file_name: %s" % out_stats_graph_file_name
     out_data_file_name = "%s/%s/%s_full.json" % (head, tail, tail)

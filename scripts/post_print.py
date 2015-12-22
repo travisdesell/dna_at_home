@@ -69,7 +69,7 @@ def main():
     out = completion(motif_stats, options)
     match = re.match(search, files[0])
 
-    out_name = "./motif_stats_%s_%s_%s.csv" % (tail, match.group(1))
+    out_name = "./motif_stats_%s_%s.csv" % (tail, match.group(1))
     print "output written to: %s" % out_name
 
     with open(out_name, "w") as out_file:
@@ -122,7 +122,7 @@ def process_line(motif_stats, line, options):
             if options.ebox_only and not (leboxc or leboxg):
                 return
 
-            pct = float(pct) * 100
+            pct = float(pct)
 
             # so the gene_id is everything in the '' here
             #no match?     0, 0     988 atgtt CCTCCT tttcc     993 0.2110 > 'ISG15 chr1 948346 949346 948846 +'
@@ -150,8 +150,8 @@ def process_line(motif_stats, line, options):
                 motif_stats["by_gene"][gene_id][location] = {
                     "total_pct" : 0.0,
                     "count" : 0.0,
-                    "max_pct" : 0.0,
-                    "min_pct" : 100.0,
+                    "max_pct" : pct,
+                    "min_pct" : pct,
                     "cacctg" : leboxc,
                     "caggtg" : leboxg,
                     "start" : start,
