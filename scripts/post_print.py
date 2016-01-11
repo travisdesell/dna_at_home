@@ -24,6 +24,8 @@ def main():
     parser.add_option("--sample_dir", dest="sample_dir", help="What sample directory should be used?", metavar="STRING", type="string")
     parser.add_option("--best_pct", dest="best_pct", help="What was the pct cutoff used to generate the data?", metavar="FLOAT", type="float")
     parser.add_option("--ebox_only", dest="ebox_only", help="Only return motifs containing ebox with motif or neighbors", action="store_true", default=False)
+    parser.add_option("--weight", dest="weight", help="weight", metavar="STRING", type="string")
+    #XXX in the future calculate the weight value
 
     (options, args) = parser.parse_args()
     if not options.sample_dir or not options.best_pct:
@@ -87,10 +89,6 @@ def main():
 #      $location : {
 #        total_pct : 1234,
 #        count : 500,
-#        max_pct : 12,
-#        min_pct : 12,
-#        sos_pct : 1234,
-#        max_start : 11111
 #      },
 #    },
 #  },
@@ -150,13 +148,10 @@ def process_line(motif_stats, line, options):
                 motif_stats["by_gene"][gene_id][location] = {
                     "total_pct" : 0.0,
                     "count" : 0.0,
-                    "max_pct" : pct,
-                    "min_pct" : pct,
                     "cacctg" : leboxc,
                     "caggtg" : leboxg,
                     "start" : start,
                     "location" : location,
-                    "sos_pct" : 0.0,
                     "lneighbor" : lneighbor,
                     "rneighbor" : rneighbor,
                     "motif" : motif.lower(),
@@ -173,13 +168,6 @@ def process_line(motif_stats, line, options):
             lmod["total_pct"] = lmod["total_pct"] + pct
             lmod["count"] = lmod["count"] + 1
 
-            if pct > lmod["max_pct"]:
-                lmod["max_pct"] = pct
-
-            if pct < lmod["min_pct"]:
-                lmod["min_pct"] = pct
-
-            lmod["sos_pct"] = lmod["sos_pct"] + pct * pct
 
         else:
             print "no match? %s" % line
@@ -192,9 +180,11 @@ def completion(motif_stats, options):
         for location in motif_stats["by_gene"][gene_id]:
 
             lmotif = motif_stats["by_gene"][gene_id][location]
-            lmotif["avg_pct_best"] = lmotif["total_pct"] / lmotif["count"]
+
+            #correct this for different solution numbers
+            #lmotif["avg_pct_best"] = lmotif["total_pct"] / lmotif["count"]
+            lmotif["avg_pct_best"] = lmotif["total_pct"] / float(options.weight)
 #            lmotif["avg_pct"] = lmotif["total_pct"] / motif_stats["sample_count"]
-            lmotif["std_dev_best"] = math.sqrt((lmotif["sos_pct"] - lmotif["total_pct"] * lmotif["total_pct"] / lmotif["count"])/lmotif["count"])
             #if lmotif["count"] > 100 and lmotif["avg_pct_best"] > 10:
             if lmotif["avg_pct_best"] > options.best_pct:
                 readable.append("\t".join((
