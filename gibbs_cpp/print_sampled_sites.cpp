@@ -71,9 +71,11 @@ int main(int argc, char** argv) {
                 count_percentage = ((double)sequences->at(i)->accumulated_samples.at(j).at(k)) / ((double)sample_period);
 
                 if (count_percentage > best_site_percentage) {
-                    printf("%5d,%2d%8d ", i, j, (k + 1) - motif_models.at(j).motif_width);
+                    //printf("%5d,%2d%8d ", i, j, (k + 1) - motif_models.at(j).motif_width); //checking off by one problem
+                    printf("%5d,%2d%8d ", i, j, (k + 2) - motif_models.at(j).motif_width);
                     print_sample_and_nearest(sequences->at(i), motif_models.at(j), k, 5);
-                    printf(" %7d %2.4lf %s\n", k, count_percentage, sequences->at(i)->name.c_str());
+                    //printf(" %7d %2.4lf %s\n", k, count_percentage, sequences->at(i)->name.c_str());
+                    printf(" %7d %2.4lf %s\n", k + 1, count_percentage, sequences->at(i)->name.c_str());
                 }
             }
         }

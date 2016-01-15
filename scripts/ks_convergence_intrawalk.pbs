@@ -3,16 +3,20 @@
 echo $0
 USAGE="USAGE: qsub ks_convergence_intrawalk.pbs -v ARGS=\"...\""
 
+#LOAD="module load python-2.7.10"
+#${LOAD}
 
 if [ ! -z "${PBS_O_WORKDIR+xxx}" ]; then
 	cd $PBS_O_WORKDIR
 fi
 
 [[ -z ${ARGS+xxx} ]] && { echo "NO ARGS SPECIFIED!" >&2; exit 1; }
-
+PATH="/home/groupdirs/epigenetics/python_tools/lib/python2.6/site-packages/:$PATH"
+PYTHONPATH="/home/groupdirs/epigenetics/python_tools/lib/python2.6/site-packages/:$PYTHONPATH"
+LD_LIBRARY_PATH="/home/groupdirs/epigenetics/python_tools/lib/python2.6/site-packages/:/home/groupdirs/epigenetics/local/lib:/usr/lib64/python2.6/site-packages:$LD_LIBRARY_PATH"
 echo "ARGS: ${ARGS}"
 echo "build command"
-CMD="/home/kristopher.zarns/dna_at_home/scripts/ks_convergence_intrawalk.py ${ARGS}"
+CMD="/home/groupdirs/epigenetics/dna_at_home_results/dna_at_home/scripts/ks_convergence_intrawalk.py ${ARGS}"
 echo "CMD: ${CMD}"
 
 #PBS -l nodes=1:ppn=1

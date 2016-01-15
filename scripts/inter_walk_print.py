@@ -22,19 +22,32 @@ def main():
     usage = ""
     parser = OptionParser(usage)
     parser.add_option("--step", dest="step", help="Which step should be compared?", metavar="INT", type="int")
+    parser.add_option("--range", dest="range", help="Use ranged files instead of step", action="store_true", default=False)
+    parser.add_option("--all", dest="all", help="Use ranged all files instead of step", action="store_true", default=False)
     parser.add_option("--sample_dir", dest="sample_dir", help="What sample directory should be used?", metavar="STRING", type="string")
     parser.add_option("--best_pct", dest="best_pct", help="What was the pct cutoff used to generate the data?", metavar="FLOAT", type="float")
     parser.add_option("--ebox_only", dest="ebox_only", help="Only return motifs containing ebox with motif or neighbors", action="store_true", default=False)
     parser.add_option("--tabbed_csv", dest="tabbed_csv", help="Produce a tab delimited csv instead of latex format output", action="store_true", default=False)
 
     (options, args) = parser.parse_args()
-    if not options.step or not options.sample_dir or not options.best_pct:
+    if not (options.step or options.range or options.all) or not options.sample_dir or not options.best_pct:
         parser.print_help()
         parser.error("missing options: %s" % options)
 
     #motif_files = ["./walk_200010_steps_30000.motifs"]
     #for motif_file in motif_files:
-    search = re.compile("^.*_%s.motifs" % options.step)
+    search = None
+    step = options.step
+    if options.range:
+        search = re.compile("^walk.*_steps_range.*.motifs")
+        step = "range"
+    elif options.all:
+        search = re.compile("^walk.*_steps_all.*.motifs")
+        step = "all"
+
+    else:
+        search = re.compile("^walk_.*_steps_%s.motifs" % step)
+
     files = [f for f in os.listdir(options.sample_dir) if re.match(search, f)]
 
     (head, tail) = os.path.split(options.sample_dir)
@@ -50,7 +63,7 @@ def main():
         "sample_count" : len(files),
         "best_pct" : options.best_pct,
         "source" : tail,
-        "step" : options.step,
+        "step" : step,
         "motif_num" : -1,
         "seq_num" : -1
     }
@@ -70,14 +83,18 @@ def main():
                 print "file %s done" % walk
                 in_file.close()
 
-    print "motif_stats: %s" % motif_stats
+    #print "motif_stats: %s" % motif_stats
     out = completion(motif_stats, options)
-    print "out: %s" % out
+    #print "out: %s" % out
     out_name = "%s/motif_stats_%s_%s.json"
+
     if options.tabbed_csv:
         out_name = "%s/motif_stats_%s_%s.csv"
 
-    with open(out_name % (options.sample_dir, tail, options.step), "w") as out_file:
+    out_name = out_name % ("./", tail, step)
+    print "output written to: %s" % out_name
+    #with open(out_name % (options.sample_dir, tail, step), "w") as out_file:
+    with open(out_name, "w") as out_file:
         #json.dump(motif_stats, out_file, indent=4, separators=(',', ': '))
         if options.tabbed_csv:
             writer = csv.writer(out_file, dialect=csv.excel_tab)
@@ -110,7 +127,7 @@ def main():
 #      max_pct : 12,
 #      min_pct : 12,
 #      sos_pct : 1234,
-#      max_gene_id : asdf,
+#      max_gene_id : aaaa,
 #      max_gene_start
 #    },
 #  }
@@ -169,8 +186,10 @@ def process_line(motif_stats, line, options):
 
                 tss_offsets = []
                 for single_tss in tss.split(","):
-                    
-                    tss_offsets.append(str(int(single_tss) - (int(region_start) + int(start))))
+                    #start is an offset from region_start
+                    #to change it to an offset from tss
+                    #we need to find the difference of tss and region_start
+                    tss_offsets.append(str(int(start) - (int(single_tss) - int(region_start))))
 
                 motif_stats["by_gene"][gene_id][super_motif] = {
                     "total_pct" : 0.0,
@@ -180,6 +199,7 @@ def process_line(motif_stats, line, options):
                     "cacctg" : leboxc,
                     "caggtg" : leboxg,
                     "start" : start,
+                    "location" : str(int(start) + int(region_start)),
                     "sos_pct" : 0.0,
                     "lneighbor" : lneighbor,
                     "rneighbor" : rneighbor,
@@ -252,21 +272,22 @@ def completion(motif_stats, options):
                 if options.tabbed_csv:
                     #estimated tss offset is due to combined genes.  if we had 2 tss...
                     readable.append("\t".join((
-                        "%d" % (lmotif["count"]),
-                        "%.2f" % (lmotif["avg_pct_best"]),
-                        lmotif["gene_symbol"],
                         lmotif["chrom"],
+                        lmotif["gene_symbol"],
+                        lmotif["tss"],
+                        lmotif["motif"],
+                        lmotif["location"],
+                        "%.2f" % (lmotif["avg_pct_best"]),
                         lmotif["region_start"],
                         lmotif["region_end"],
-                        lmotif["tss"],
                         lmotif["tss_offset"],
                         lmotif["lneighbor"],
-                        lmotif["motif"],
                         lmotif["rneighbor"],
                         super_motif,
                         str(lmotif["cacctg"]),
                         str(lmotif["caggtg"]),
-                        lmotif["strand"]
+                        lmotif["strand"],
+                        "%d" % (lmotif["count"])
                     )))
                 else:
                     readable.append("& ".join((
@@ -281,21 +302,22 @@ def completion(motif_stats, options):
     sort_nicely(readable)
     if options.tabbed_csv:
         readable.insert(0, ("\t".join((
-            "count",
-            "avg_pct",
-            "gene_symbol",
             "chromosome",
+            "gene_symbol",
+            "tss",
+            "motif",
+            "location",
+            "avg_pct",
             "interval_start",
             "interval_end",
-            "tss",
             "tss_offset",
             "left_neighbor",
-            "motif",
             "right_neighbor",
             "combined_motif",
             "cacctg",
             "caggtg",
-            "strand"
+            "strand",
+            "count"
         ))))
     return readable
 #            lmotif["std_dev"] = ((
@@ -329,17 +351,20 @@ def completion(motif_stats, options):
 #        if EBOXG_R.match(super_motif):
 #            gmotif["eboxg"] = True
 #
-def tryint(s):
+def tryint(string):
+    """is it a int?"""
     try:
-        return int(s)
+        return int(string)
     except:
-        return s
+        return string
 
-def alphanum_key(s):
-    return [tryint(c) for c in re.split('([0-9]+)', s) ]
+def alphanum_key(string):
+    """find ints strings"""
+    return [tryint(char) for char in re.split('([0-9]+)', string)]
 
-def sort_nicely(l):
-    l.sort(key=alphanum_key)
+def sort_nicely(unsorted_list):
+    """natural sort"""
+    unsorted_list.sort(key=alphanum_key)
 
 if __name__ == "__main__":
     main()
