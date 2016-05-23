@@ -97,7 +97,7 @@ void remove_carriage_return(string &s) {
 }
 
 void read_sequences(vector<Sequence*> *sequences, string sequence_filename, int max_sites, int number_motifs, int max_shift_distance) {
-    #ifdef _BOINC_
+#ifdef _BOINC_
     string input_path;
     int retval;
 

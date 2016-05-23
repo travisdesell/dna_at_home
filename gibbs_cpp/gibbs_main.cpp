@@ -47,6 +47,7 @@
 #define SITES_OUTPUT_FILE "final_sites.txt"
 #define SAMPLES_CHECKPOINT_FILE "gibbs_samples_checkpoint.txt"
 #define SAMPLES_OUTPUT_FILE "accumulated_samples.txt"
+#define MOTIFS_OUTPUT_FILE "motifs.txt"
 
 using namespace std;
 
@@ -464,9 +465,31 @@ int main(int argc, char** argv) {
         if (sample_period > 0) write_accumulated_samples(string(SAMPLES_OUTPUT_FILE), sequences);
 
         if (print_motif_models) {
+#ifdef _BOINC_
+            string input_path;
+            int retval;
+
+            retval = boinc_resolve_filename_s(MOTIFS_OUTPUT_FILE, input_path);
+            if (retval) {
+                fprintf(stderr, "APP: opening output file for motifs)\n");
+                return 1;
+            }   
+
+            ofstream motif_file(input_path.c_str());
+            motif_file << "<motif_models>" << endl;
+            for (unsigned int i = 0; i < motif_models.size(); i++) {
+                motif_models.at(i).print(motif_file);
+            }
+            motif_file << "</motif_models>" << endl;
+            motif_file.close();
+#else
+
+            fprintf(stderr, "<motif_models>\n");
             for (unsigned int i = 0; i < motif_models.size(); i++) {
                 motif_models.at(i).print(cerr);
             }
+            fprintf(stderr, "</motif_models>\n");
+#endif
         }
 
 //        if (total_independent_walks > 1) sites_output_file << "</independent_walk>" << endl << endl;
