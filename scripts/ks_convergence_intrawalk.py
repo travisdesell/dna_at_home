@@ -162,28 +162,34 @@ def ks_2(file_a=None, file_b=None, data_a=None, data_b=None):
 
 def get_files_in_dir(in_dir):
     """Organize files by walk and sort"""
-    files = sorted(os.listdir(in_dir))
 
-    pattern = re.compile(r"^walk_(\d+)_steps_(\d+)$")
-
+    parents = sorted(os.listdir(in_dir))
     file_values = {}
-    total_files = 0
-    for file_name in files:
-        #print file_name
-        match = pattern.match(file_name)
-        #print pattern
-        #print match
-        if match:
-            total_files += 1
-            match1 = int(match.group(1))
-            match2 = int(match.group(2))
-            if match1 not in file_values:
-                file_values[match1] = []
-            file_values[match1].append(match2)
+    for parent in parents:
+        try:
+            files = sorted(os.listdir("%s/%s" % (in_dir, parent)))
+        except Exception as ex:
+            print ex
+
+        pattern = re.compile(r"^samples_(\d+)_(\d+)$")
+
+        total_files = 0
+        for file_name in files:
+            #print file_name
+            match = pattern.match(file_name)
+            #print pattern
+            #print match
+            if match:
+                total_files += 1
+                match1 = int(match.group(1))
+                match2 = int(match.group(2))
+                if match1 not in file_values:
+                    file_values[match1] = []
+                file_values[match1].append(match2)
     #print file_values
 
-    for file_name in file_values:
-        file_values[file_name] = sorted(file_values[file_name])
+    for walk_name in file_values:
+        file_values[walk_name] = sorted(file_values[walk_name])
 
     #print file_values
     return (file_values, total_files)
@@ -217,7 +223,7 @@ def process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files
             print "processing %s of %s" % (processed_files, total_files)
             #print "data3: %s" % data
             if step == 0:
-                file_name_b = "_".join(["%s/walk" % in_dir, walk_str, "steps", step_str])
+                file_name_b = "_".join(["%s/walk_%s/samples_%s_%s" % (in_dir, walk_str, walk_str, step_str)])
                 if walk_str not in data:
                     data[walk_str] = {}
                 continue
@@ -225,7 +231,7 @@ def process_files_intrawalk(file_values, in_dir, out_data_file_name, total_files
             #print "data4: %s" % data
 
             file_name_a = file_name_b
-            file_name_b = "_".join(["%s/walk" % in_dir, walk_str, "steps", step_str])
+            file_name_b = "_".join(["%s/walk_%s/samples_%s_%s" % (in_dir, walk_str, walk_str, step_str)])
             #print "step: %s" % step
             #print "str step: %s" % str(step)
             #print "step type: %s" % type(step)
