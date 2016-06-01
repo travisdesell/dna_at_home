@@ -47,6 +47,22 @@ void split_line_by(string line, char seperator, vector<string> &result) {
     }   
 }
 
+string reverse_complement(string motif) {
+    string rc;
+
+    for (uint32_t i = motif.size() - 1; i >= 0; i--) {
+        if (motif[i] == 'A') rc += 'T';
+        else if (motif[i] == 'A') rc += 'G';
+        else if (motif[i] == 'A') rc += 'C';
+        else if (motif[i] == 'A') rc += 'A';
+        else if (motif[i] == 'X') rc += 'X';
+    }
+
+    cout << "motif '" << motif << "' -- reverse complement '" << rc << "'" << endl;
+
+    return rc;
+}
+
 int is_valid_nucleotide(char nucleotide) {
     switch (nucleotide) {
         case 'A':
@@ -160,21 +176,8 @@ class PositionWeightMatrix {
 };
 
 ostream &operator<<(ostream &os, PositionWeightMatrix const &pwm) { 
-    os << "position weight matrix:" << endl;
-    os << "\t" << setw(5) << "A";
-    os << ", " << setw(5) << "C";
-    os << ", " << setw(5) << "G";
-    os << ", " << setw(5) << "T";
-    os << endl;
-
     string motif_nucleotides("");
     for (uint32_t i = 0; i < pwm.model_length(); i++) {
-        os << "\t" << fixed << setw(5) << setprecision(4) << pwm.probability(i, 0);
-        os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 1);
-        os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 2);
-        os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 3);
-        os << endl;
-
         if (pwm.probability(i, 0) > 0.90) motif_nucleotides.append("A");
         else if (pwm.probability(i, 1) > 0.90) motif_nucleotides.append("C");
         else if (pwm.probability(i, 2) > 0.90) motif_nucleotides.append("G");
@@ -184,6 +187,22 @@ ostream &operator<<(ostream &os, PositionWeightMatrix const &pwm) {
 
     os << "motif: " << motif_nucleotides << endl;
 
+    if (motif_nucleotides.find('?') != string::npos) {
+        os << "position weight matrix:" << endl;
+        os << "\t" << setw(5) << "A";
+        os << ", " << setw(5) << "C";
+        os << ", " << setw(5) << "G";
+        os << ", " << setw(5) << "T";
+        os << endl;
+
+        for (uint32_t i = 0; i < pwm.model_length(); i++) {
+            os << "\t" << fixed << setw(5) << setprecision(4) << pwm.probability(i, 0);
+            os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 1);
+            os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 2);
+            os << ", " << fixed << setw(5) << setprecision(4) << pwm.probability(i, 3);
+            os << endl;
+        }
+    }
     return os; 
 }
 
@@ -428,18 +447,6 @@ class Sequences {
             sequence_file.close();
         }
 
-        /*
-        double calculate_fitness(const PositionWeightMatrix &pwm) const {
-            double fitness = 0.0;
-
-            for (uint32_t i = 0; i < sequences.size(); i++) {
-                fitness += sequences.at(i).calculate_fitness(pwm, verbose);
-            }
-
-            return fitness;
-        }
-        */
-
         double calculate_fitness(const vector<PositionWeightMatrix> &pwms) const {
             double fitness = 0.0;
 
@@ -567,7 +574,7 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
-        cout << "Best PWMs:" << endl;
+        //cout << "Best PWMs:" << endl;
 
         vector<PositionWeightMatrix> all_pwms;
 
@@ -592,8 +599,8 @@ int main(int argc, char **argv) {
         cout << endl;
         cout << "SORTED BEST PWMS:" << endl;
         for (uint32_t i = 0; i < all_pwms.size(); i++) {
-            cout << all_pwms[i];
-            cout << "fitness: " << all_pwms[i].get_fitness() << endl << endl;
+            cout << "fitness: " << setw(10) << setprecision(5) << all_pwms[i].get_fitness() << ", " << all_pwms[i];
+            cout << endl;
         }
     }
 

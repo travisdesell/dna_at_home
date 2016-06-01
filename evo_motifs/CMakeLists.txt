@@ -85,3 +85,7 @@ include_directories(${MPI_INCLUDE_PATH})
 
 add_executable(motif_fitness motif_fitness)
 target_link_libraries(motif_fitness ${MPI_LIBRARY} ${MPI_EXTRA_LIBRARY} ${UNDVC_COMMON_LIBRARY} ${TAO_LIBRARY} ${Boost_LIBRARIES})
+
+add_executable(brute_force brute_force)
+target_link_libraries(brute_force ${UNDVC_COMMON_LIBRARY} ${Boost_LIBRARIES})
+
